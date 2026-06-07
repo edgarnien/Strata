@@ -52,6 +52,18 @@ class Strata {
         this.isProcessingDownload = false;
         this.h264Encoder          = null;
         this.videoFrameCount      = 0;
+        this.recordingStartTime   = 0;   // wall-clock ms when user pressed REC
+
+        // Offline rendering (for video export): synthetic animation time
+        // null = live preview; number = synthetic ms elapsed for current frame
+        this.offlineRenderTime  = null;
+        this.offlineTimeBase    = 0;    // subtracted from offlineRenderTime on cycle reset
+        this._videoFrameUpdated = false; // tracks whether updateDisplay ran in current offline frame
+
+        // Seeds saved at recording-start so offline render matches what the user watched
+        this._recordedRandomStartPhase = 0;
+        this._recordedRandomPeaks      = 1;
+        this._recordedStartImageIndex  = 0;
 
         // Background color state
         this.backgroundColorEnabled = false;
@@ -59,6 +71,9 @@ class Strata {
 
         // Reverse mask state
         this.reverseMaskEnabled = false;
+
+        // Image mask state (visible only with 2+ images)
+        this.imageMaskEnabled = false;
 
         // Initialize other event listeners (isolated from upload)
         this.initializeEventListeners();
@@ -149,6 +164,7 @@ class Strata {
             if (this.isGalleryExpanded) this.updateExpandedView();
         }
 
+        this.updateImageMaskBtnVisibility();
         console.log(`Image added. Total images: ${this.images.length}`);
     }
 
@@ -174,6 +190,7 @@ class Strata {
 
         this.updateStackedView();
         this.updateExpandedView();
+        this.updateImageMaskBtnVisibility();
 
         console.log(`Image removed. Total images: ${this.images.length}`);
     }
@@ -558,8 +575,12 @@ class Strata {
 
         const nextIndex = (this.currentImageIndex + 1) % this.images.length;
 
-        // Reset animation state
-        this.animationStartTime = performance.now();
+        // Reset animation state — use synthetic base for offline rendering, wall-clock for live
+        if (this.offlineRenderTime !== null) {
+            this.offlineTimeBase = this.offlineRenderTime;
+        } else {
+            this.animationStartTime = performance.now();
+        }
         this.motionAnimationFrame = 0;
         this.lastWaveCycle = -1;
         this.lastCycleNumber = -1;
@@ -567,6 +588,7 @@ class Strata {
         this._glitchCycle = -1;
         this._randomStartPhase = Math.random();
         this._randomPeaks = Math.floor(Math.random() * 3) + 1;
+        this._imgMaskRawProgress = 0; // kept for safety (unused)
 
         this.currentImageIndex = nextIndex;
         this.originalImage = this.images[nextIndex].img;
@@ -897,6 +919,9 @@ class Strata {
 
         // Reverse mask control
         this.safeAddEventListener('reverseMaskBtn', 'click', () => this.toggleReverseMask());
+
+        // Image mask control (2nd image as mask)
+        this.safeAddEventListener('imageMaskBtn', 'click', () => this.toggleImageMask());
     }
 
     // Helper method to safely add event listeners
@@ -998,6 +1023,53 @@ class Strata {
         const numBarsHorizontally = Math.max(1, Math.round(width / pixelSize));
         const numBarsVertically = Math.max(1, Math.round(height / desiredBarHeight));
 
+        // ── IMG MASK: sample the NEXT image via a tiny canvas (1 px per bar) ──
+        // This is reliable because we draw at bar-grid resolution (e.g. 10×3),
+        // avoiding any state issues with the full-resolution this.ctx.
+        if (this.imgMaskActive()) {
+            const n = this.images.length;
+            const nextImg = this.images[(this.currentImageIndex + 1) % n].img;
+
+            // Downscale next image to bar-grid size — each pixel = average colour of one bar region
+            const tinyCanvas = document.createElement('canvas');
+            tinyCanvas.width  = numBarsHorizontally;
+            tinyCanvas.height = numBarsVertically;
+            const tinyCtx = tinyCanvas.getContext('2d');
+            tinyCtx.drawImage(nextImg, 0, 0, numBarsHorizontally, numBarsVertically);
+            const tinyData = tinyCtx.getImageData(0, 0, numBarsHorizontally, numBarsVertically).data;
+
+            const bars = [];
+            for (let col = 0; col < numBarsHorizontally; col++) {
+                const x = Math.round(col * width / numBarsHorizontally);
+                const actualBarWidth = Math.round((col + 1) * width / numBarsHorizontally) - x;
+                for (let row = 0; row < numBarsVertically; row++) {
+                    const y = Math.round(row * height / numBarsVertically);
+                    const actualBarHeight = Math.round((row + 1) * height / numBarsVertically) - y;
+                    const idx = (row * numBarsHorizontally + col) * 4;
+                    // Include ALL bars — even dark ones — so Image 2 fully covers Image 1
+                    bars.push({
+                        x, y,
+                        r: tinyData[idx]     || 0,
+                        g: tinyData[idx + 1] || 0,
+                        b: tinyData[idx + 2] || 0,
+                        width:  actualBarWidth,
+                        height: actualBarHeight
+                    });
+                }
+            }
+
+            // Shuffle
+            for (let i = bars.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [bars[i], bars[j]] = [bars[j], bars[i]];
+            }
+
+            this.motionBarOrder = bars;
+            console.log(`Animation prepared: ${bars.length} bars (IMG MASK – ${numBarsHorizontally}×${numBarsVertically} grid)`);
+            return; // ← skip normal sampling path; this.ctx is untouched
+        }
+
+        // ── Normal path: sample colours from this.ctx (current image) ──
         const imageData = this.ctx.getImageData(0, 0, width, height);
         const data = imageData.data;
 
@@ -1070,20 +1142,28 @@ class Strata {
                 }
             }
         }
-        
+
         // Shuffle bars randomly
         for (let i = bars.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [bars[i], bars[j]] = [bars[j], bars[i]];
         }
-        
+
         this.motionBarOrder = bars;
-        console.log(`Animation prepared: ${bars.length} visible bars will be animated`);
+        console.log(`Animation prepared: ${bars.length} bars`);
+    }
+
+    // Returns elapsed animation time in ms.
+    // During live preview: wall-clock time since animation start.
+    // During offline video rendering: synthetic time (frame index × frame duration).
+    getElapsedTime() {
+        if (this.offlineRenderTime !== null) return this.offlineRenderTime - this.offlineTimeBase;
+        return performance.now() - this.animationStartTime;
     }
 
     runMotionAnimation() {
         if (!this.motionAnimationRunning) return;
-        
+
         // Route to different motion types
         switch (this.motionType) {
             case 'motion1':
@@ -1110,26 +1190,43 @@ class Strata {
     }
 
     runMotion1Animation() {
-        this.clearCanvasBackground();
-
-        const elapsedTime = performance.now() - this.animationStartTime;
+        const elapsedTime = this.getElapsedTime();
         const cycleDuration = this.baseCycleDuration / this.animationSpeed;
         const currentCycleNumber = Math.floor(elapsedTime / cycleDuration);
         if (this.checkCycleAdvance(currentCycleNumber)) return;
 
         const halfCycleDuration = cycleDuration / 2;
         const timeInCycle = elapsedTime % cycleDuration;
+        const rawProgress = timeInCycle / cycleDuration;
 
-        let visibleBarCount;
-        if (timeInCycle < halfCycleDuration) {
-            visibleBarCount = Math.floor((timeInCycle / halfCycleDuration) * this.motionBarOrder.length);
+        this.clearCanvasBackground();
+
+        const N1 = this.motionBarOrder.length;
+        if (this.imgMaskActive()) {
+            // IMG MASK: bars reveal the next image through clip-windows — guaranteed visible
+            const visibleCount = Math.floor(rawProgress * N1);
+            if (visibleCount > 0) {
+                const n = this.images.length;
+                const nextImg = this.images[(this.currentImageIndex + 1) % n].img;
+                this.pixelCtx.save();
+                this.pixelCtx.beginPath();
+                for (let i = 0; i < visibleCount; i++) {
+                    const bar = this.motionBarOrder[i];
+                    this.pixelCtx.rect(bar.x, bar.y, bar.width, bar.height);
+                }
+                this.pixelCtx.clip();
+                this.drawImageToContext(this.pixelCtx, nextImg);
+                this.pixelCtx.restore();
+            }
         } else {
-            const downProgress = (timeInCycle - halfCycleDuration) / halfCycleDuration;
-            visibleBarCount = Math.floor((1 - downProgress) * this.motionBarOrder.length);
-        }
-
-        for (let i = 0; i < visibleBarCount; i++) {
-            this.drawBar(this.motionBarOrder[i]);
+            let visibleBarCount;
+            if (timeInCycle < halfCycleDuration) {
+                visibleBarCount = Math.floor((timeInCycle / halfCycleDuration) * N1);
+            } else {
+                const downProgress = (timeInCycle - halfCycleDuration) / halfCycleDuration;
+                visibleBarCount = Math.floor((1 - downProgress) * N1);
+            }
+            for (let i = 0; i < visibleBarCount; i++) this.drawBar(this.motionBarOrder[i]);
         }
 
         this.updateDisplay();
@@ -1138,9 +1235,7 @@ class Strata {
     }
 
     runMotion3Animation() {
-        this.clearCanvasBackground();
-
-        const elapsedTime = performance.now() - this.animationStartTime;
+        const elapsedTime = this.getElapsedTime();
         const cycleDuration = this.baseCycleDuration / this.animationSpeed;
         const currentCycleNumber = Math.floor(elapsedTime / cycleDuration);
         if (this.checkCycleAdvance(currentCycleNumber)) return;
@@ -1165,36 +1260,53 @@ class Strata {
         const phase = (elapsedTime % cycleDuration) / cycleDuration;
         const maxR = this._impulseMaxR;
         const scatterW = maxR * 0.16;
-        const expandEnd = 0.62; // expansion occupies first 62%, contraction the rest
+        const expandEnd = 0.62;
+
+        this.clearCanvasBackground();
 
         const expanding = phase <= expandEnd;
-        const contractT = expanding ? 0 : (phase - expandEnd) / (1 - expandEnd);
-        // Contraction eases in (slow start → fast collapse)
-        const collapseR = expanding ? maxR : maxR * Math.pow(1 - contractT, 1.6);
 
-        for (const bar of this.motionBarOrder) {
-            // Stable per-bar random threshold — no per-frame flicker
-            const hx = (bar.x * 73856093) >>> 0;
-            const hy = (bar.y * 19349663) >>> 0;
-            const barT = ((hx ^ hy) * 2654435761 >>> 0) / 0xFFFFFFFF;
-
-            let visible = false;
-            for (const o of this._impulseOrigins) {
-                const dist = Math.sqrt((bar.x - o.x) ** 2 + (bar.y - o.y) ** 2);
-
-                if (expanding) {
-                    // Each origin has a staggered start; ease-out expansion (fast → slow)
-                    const localT = Math.max(0, Math.min(1, (phase - o.delay) / (expandEnd - o.delay)));
+        if (this.imgMaskActive()) {
+            // IMG MASK: circles expand outward — clip-window rendering
+            const scaledPhase = Math.min(phase, expandEnd);
+            const visibleBars = [];
+            for (const bar of this.motionBarOrder) {
+                const hx = (bar.x * 73856093) >>> 0;
+                const hy = (bar.y * 19349663) >>> 0;
+                const barT = ((hx ^ hy) * 2654435761 >>> 0) / 0xFFFFFFFF;
+                let visible = false;
+                for (const o of this._impulseOrigins) {
+                    const dist = Math.sqrt((bar.x - o.x) ** 2 + (bar.y - o.y) ** 2);
+                    const localT = Math.max(0, Math.min(1, (scaledPhase - o.delay) / (expandEnd - o.delay)));
                     const r = maxR * (1 - Math.pow(1 - localT, 2.4));
-                    // Bar fills in as circle passes — scatter on leading edge
                     if (barT < (r - dist) / scatterW) { visible = true; break; }
-                } else {
-                    // All origins collapse together outside-in — scatter on trailing edge
-                    if (barT < (collapseR - dist) / scatterW) { visible = true; break; }
                 }
+                if (visible) visibleBars.push(bar);
             }
+            this._clipDrawImgMask(visibleBars);
+        } else {
+            const contractT = expanding ? 0 : (phase - expandEnd) / (1 - expandEnd);
+            const collapseR = expanding ? maxR : maxR * Math.pow(1 - contractT, 1.6);
 
-            if (visible) this.drawBar(bar);
+            for (const bar of this.motionBarOrder) {
+                const hx = (bar.x * 73856093) >>> 0;
+                const hy = (bar.y * 19349663) >>> 0;
+                const barT = ((hx ^ hy) * 2654435761 >>> 0) / 0xFFFFFFFF;
+
+                let visible = false;
+                for (const o of this._impulseOrigins) {
+                    const dist = Math.sqrt((bar.x - o.x) ** 2 + (bar.y - o.y) ** 2);
+                    if (expanding) {
+                        const localT = Math.max(0, Math.min(1, (phase - o.delay) / (expandEnd - o.delay)));
+                        const r = maxR * (1 - Math.pow(1 - localT, 2.4));
+                        if (barT < (r - dist) / scatterW) { visible = true; break; }
+                    } else {
+                        if (barT < (collapseR - dist) / scatterW) { visible = true; break; }
+                    }
+                }
+
+                if (visible) this.drawBar(bar);
+            }
         }
 
         this.updateDisplay();
@@ -1203,7 +1315,7 @@ class Strata {
     }
 
     runMotion4Animation() {
-        const elapsedTime = performance.now() - this.animationStartTime;
+        const elapsedTime = this.getElapsedTime();
         const cycleDuration = this.baseCycleDuration / this.animationSpeed;
         const currentCycle = Math.floor(elapsedTime / cycleDuration);
         const timeInCycle = elapsedTime % cycleDuration;
@@ -1222,49 +1334,63 @@ class Strata {
             this._wavePhase  = rng() * Math.PI * 2;
         }
 
-        this.clearCanvasBackground();
-
         const { width, height } = this.canvas;
         const rawProgress = timeInCycle / cycleDuration;
 
-        // Phase 1 (0→0.5): bars emerge; Phase 2 (0.5→1): bars retreat
-        const advancing = rawProgress <= 0.5;
-        const phaseT = advancing ? rawProgress * 2 : (rawProgress - 0.5) * 2;
-        // Ease in-out within each half
-        const wavePos = phaseT < 0.5
-            ? 2 * phaseT * phaseT
-            : 1 - Math.pow(-2 * phaseT + 2, 3) / 2;
+        this.clearCanvasBackground();
 
-        // Wide scatter zone: bars gradually appear/disappear ahead of the main front.
-        // Each bar has a stable random threshold (hashed from its coords) so it flickers
-        // at a consistent position in the wave rather than every frame.
+        // Wide scatter zone for organic wave edge
         const scatterWidth = 0.45;
 
-        for (const bar of this.motionBarOrder) {
-            let along, perp;
-            switch (this.waveDirection) {
-                case 0: along = bar.x / width;       perp = bar.y / height; break;
-                case 1: along = 1 - bar.x / width;   perp = bar.y / height; break;
-                case 2: along = bar.y / height;       perp = bar.x / width;  break;
-                case 3: along = 1 - bar.y / height;  perp = bar.x / width;  break;
+        if (this.imgMaskActive()) {
+            // IMG MASK: one-way wave sweep — clip-window rendering
+            const wavePos = rawProgress < 0.5
+                ? 2 * rawProgress * rawProgress
+                : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
+            const visibleBars = [];
+            for (const bar of this.motionBarOrder) {
+                let along, perp;
+                switch (this.waveDirection) {
+                    case 0: along = bar.x / width;      perp = bar.y / height; break;
+                    case 1: along = 1 - bar.x / width;  perp = bar.y / height; break;
+                    case 2: along = bar.y / height;      perp = bar.x / width;  break;
+                    case 3: along = 1 - bar.y / height; perp = bar.x / width;  break;
+                }
+                const disp = this._waveAmp1 * Math.sin(perp * this._waveFreq1 * Math.PI * 2 + this._wavePhase)
+                           + this._waveAmp2 * Math.sin(perp * this._waveFreq2 * Math.PI * 2 - this._wavePhase * 1.3);
+                const effectiveAlong = along + disp;
+                const hx = (bar.x * 73856093) >>> 0;
+                const hy = (bar.y * 19349663) >>> 0;
+                const barT = ((hx ^ hy) * 2654435761 >>> 0) / 0xFFFFFFFF;
+                if (barT < (wavePos - effectiveAlong) / scatterWidth) visibleBars.push(bar);
             }
+            this._clipDrawImgMask(visibleBars);
+        } else {
+            // Phase 1 (0→0.5): bars emerge; Phase 2 (0.5→1): bars retreat
+            const advancing = rawProgress <= 0.5;
+            const phaseT = advancing ? rawProgress * 2 : (rawProgress - 0.5) * 2;
+            const wavePos = phaseT < 0.5
+                ? 2 * phaseT * phaseT
+                : 1 - Math.pow(-2 * phaseT + 2, 3) / 2;
 
-            // Organic sine displacement on the wave front shape
-            const disp = this._waveAmp1 * Math.sin(perp * this._waveFreq1 * Math.PI * 2 + this._wavePhase)
-                       + this._waveAmp2 * Math.sin(perp * this._waveFreq2 * Math.PI * 2 - this._wavePhase * 1.3);
-            const effectiveAlong = along + disp;
+            for (const bar of this.motionBarOrder) {
+                let along, perp;
+                switch (this.waveDirection) {
+                    case 0: along = bar.x / width;      perp = bar.y / height; break;
+                    case 1: along = 1 - bar.x / width;  perp = bar.y / height; break;
+                    case 2: along = bar.y / height;      perp = bar.x / width;  break;
+                    case 3: along = 1 - bar.y / height; perp = bar.x / width;  break;
+                }
+                const disp = this._waveAmp1 * Math.sin(perp * this._waveFreq1 * Math.PI * 2 + this._wavePhase)
+                           + this._waveAmp2 * Math.sin(perp * this._waveFreq2 * Math.PI * 2 - this._wavePhase * 1.3);
+                const effectiveAlong = along + disp;
+                const hx = (bar.x * 73856093) >>> 0;
+                const hy = (bar.y * 19349663) >>> 0;
+                const barT = ((hx ^ hy) * 2654435761 >>> 0) / 0xFFFFFFFF;
 
-            // Stable per-bar random value (0–1) via integer hash of position
-            const hx = (bar.x * 73856093) >>> 0;
-            const hy = (bar.y * 19349663) >>> 0;
-            const barT = ((hx ^ hy) * 2654435761 >>> 0) / 0xFFFFFFFF;
-
-            // Front position: advances 0→1, then retreats 1→0 (no jump at midpoint)
-            const frontPos = advancing ? wavePos : 1 - wavePos;
-            const threshold = (frontPos - effectiveAlong) / scatterWidth;
-
-            // Bar is visible when the front has passed its position
-            if (barT < threshold) this.drawBar(bar);
+                const frontPos = advancing ? wavePos : 1 - wavePos;
+                if (barT < (frontPos - effectiveAlong) / scatterWidth) this.drawBar(bar);
+            }
         }
 
         this.updateDisplay();
@@ -1273,96 +1399,122 @@ class Strata {
     }
 
     runMotion5Animation() {
-        const elapsedTime = performance.now() - this.animationStartTime;
+        const elapsedTime = this.getElapsedTime();
         const cycleDuration = this.baseCycleDuration / this.animationSpeed;
         const currentCycle = Math.floor(elapsedTime / cycleDuration);
         const timeInCycle = elapsedTime % cycleDuration;
 
         if (this.checkCycleAdvance(currentCycle)) return;
 
+        const rawProgress = timeInCycle / cycleDuration;
+        const totalBars = this.motionBarOrder.length;
+
+        // ── IMG MASK mode: next image's bars fade in over current image ──
+        if (this.imgMaskActive()) {
+            this.clearCanvasBackground();
+            const n = this.images.length;
+            const nextImg = this.images[(this.currentImageIndex + 1) % n].img;
+
+            const fadeZone = 0.2;
+            // Fully visible bars: batch clip+draw in one pass
+            const fullyVisible = [];
+            for (let i = 0; i < totalBars; i++) {
+                if (i / totalBars <= rawProgress) fullyVisible.push(this.motionBarOrder[i]);
+            }
+            this._clipDrawImgMask(fullyVisible);
+
+            // Fading-in bars: individual clip with alpha
+            for (let i = 0; i < totalBars; i++) {
+                const barPos = i / totalBars;
+                if (barPos > rawProgress && barPos <= rawProgress + fadeZone) {
+                    const alpha = (rawProgress + fadeZone - barPos) / fadeZone;
+                    const bar = this.motionBarOrder[i];
+                    this.pixelCtx.save();
+                    this.pixelCtx.globalAlpha = alpha;
+                    this.pixelCtx.beginPath();
+                    this.pixelCtx.rect(bar.x, bar.y, bar.width, bar.height);
+                    this.pixelCtx.clip();
+                    this.drawImageToContext(this.pixelCtx, nextImg);
+                    this.pixelCtx.restore();
+                }
+            }
+            this.pixelCtx.globalAlpha = 1.0;
+            this.updateDisplay();
+            this.motionAnimationFrame++;
+            this.scheduleNextFrame();
+            return;
+        }
+
+        // ── Standard FADE: mask-canvas approach ──
         this.pixelCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Base layer: original image at full opacity (what shows through bar holes)
         if (this.originalImage) {
             this.pixelCtx.globalAlpha = 1.0;
             this.pixelCtx.globalCompositeOperation = 'source-over';
             this.drawOriginalImageToContext(this.pixelCtx);
         }
 
-        // Step 2: Create a temporary canvas for the mask
+        // Mask canvas: overlayColor fills non-hole areas
         const maskCanvas = document.createElement('canvas');
         maskCanvas.width = this.canvas.width;
         maskCanvas.height = this.canvas.height;
         const maskCtx = maskCanvas.getContext('2d');
 
-        // Fill mask with hex color overlay
         const overlayColor = this.backgroundColorEnabled ? this.backgroundColor : '#000000';
         maskCtx.fillStyle = overlayColor;
-        maskCtx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
 
-        // Step 3: Cut out holes in the mask where bars should be visible
-        const rawProgress = timeInCycle / cycleDuration;
-        const totalBars = this.motionBarOrder.length;
+        // SHOW IMAGE: draw original image at reduced opacity on mask (visible in non-hole areas)
+        if (this.backgroundImageEnabled && this.originalImage) {
+            const opacity = parseInt(document.getElementById('opacitySlider').value) / 100;
+            maskCtx.globalAlpha = opacity;
+            this.drawImageToContext(maskCtx, this.originalImage);
+            maskCtx.globalAlpha = 1.0;
+        }
 
+        // Cut holes where bars are visible (destination-out removes mask pixels)
         maskCtx.globalCompositeOperation = 'destination-out';
 
-        // Two phase animation: fade in, then fade out
         if (rawProgress <= 0.5) {
-            // FADE IN phase: bars become windows (reveal image)
-            const fadeInProgress = rawProgress * 2; // 0 to 1
-            
+            // FADE IN: bars open up as windows
+            const fadeInProgress = rawProgress * 2;
             for (let i = 0; i < totalBars; i++) {
                 const bar = this.motionBarOrder[i];
                 const barPosition = i / totalBars;
-                
-                // Calculate opacity: how much of the hex overlay to remove
                 let cutoutOpacity;
                 if (barPosition <= fadeInProgress) {
-                    // Wave has passed - fully visible (fully cut out)
                     cutoutOpacity = 1.0;
                 } else if (barPosition <= fadeInProgress + 0.2) {
-                    // In the wave zone - transitioning
-                    const transitionProgress = (barPosition - fadeInProgress) / 0.2;
-                    cutoutOpacity = 1.0 - transitionProgress; // Fade from 1.0 to 0
+                    cutoutOpacity = 1.0 - (barPosition - fadeInProgress) / 0.2;
                 } else {
-                    // Wave hasn't reached yet - not visible (skip)
                     continue;
                 }
-                
-                // Cut out the overlay to reveal the image
                 maskCtx.globalAlpha = cutoutOpacity;
-                maskCtx.fillStyle = '#FFFFFF'; // Color doesn't matter for destination-out
+                maskCtx.fillStyle = '#FFFFFF';
                 maskCtx.fillRect(bar.x, bar.y, bar.width, bar.height);
             }
         } else {
-            // FADE OUT phase: bars close back up (hide image, show hex color)
-            const fadeOutProgress = (rawProgress - 0.5) * 2; // 0 to 1
-            
+            // FADE OUT: bars close back up
+            const fadeOutProgress = (rawProgress - 0.5) * 2;
             for (let i = 0; i < totalBars; i++) {
                 const bar = this.motionBarOrder[i];
                 const barPosition = i / totalBars;
-                
-                // Calculate opacity: how much of the hex overlay to remove
                 let cutoutOpacity;
                 if (barPosition <= fadeOutProgress) {
-                    // Wave has passed - closed (skip, hex color stays)
                     continue;
                 } else if (barPosition <= fadeOutProgress + 0.2) {
-                    // In the wave zone - transitioning
-                    const transitionProgress = (barPosition - fadeOutProgress) / 0.2;
-                    cutoutOpacity = transitionProgress; // Fade from 0 to 1.0
+                    cutoutOpacity = (barPosition - fadeOutProgress) / 0.2;
                 } else {
-                    // Wave hasn't reached yet - fully visible
                     cutoutOpacity = 1.0;
                 }
-                
-                // Cut out the overlay to reveal the image
                 maskCtx.globalAlpha = cutoutOpacity;
                 maskCtx.fillStyle = '#FFFFFF';
                 maskCtx.fillRect(bar.x, bar.y, bar.width, bar.height);
             }
         }
 
-        // Step 4: Draw the mask on top of the original image
+        // Draw mask on top of the base image
         this.pixelCtx.globalAlpha = 1.0;
         this.pixelCtx.globalCompositeOperation = 'source-over';
         this.pixelCtx.drawImage(maskCanvas, 0, 0);
@@ -1373,7 +1525,7 @@ class Strata {
     }
 
     runMotion6Animation() {
-        const elapsedTime = performance.now() - this.animationStartTime;
+        const elapsedTime = this.getElapsedTime();
         const cycleDuration = this.baseCycleDuration / this.animationSpeed;
         const currentCycle = Math.floor(elapsedTime / cycleDuration);
 
@@ -1392,13 +1544,23 @@ class Strata {
             }
         }
 
+        const rawProgress = (elapsedTime % cycleDuration) / cycleDuration;
+
         this.clearCanvasBackground();
+
         const total = this._glitchBars.length;
         if (total === 0) { this.scheduleNextFrame(); return; }
 
-        const rawProgress = (elapsedTime % cycleDuration) / cycleDuration;
-
-        if (rawProgress < 0.5) {
+        if (this.imgMaskActive()) {
+            // IMG MASK: bars appear in random glitch order covering full cycle (no retreat)
+            const target = Math.floor(total * rawProgress);
+            const visibleBars = this._glitchBars.slice(0, target);
+            // Glitch fringe on leading edge
+            for (let i = target; i < Math.min(target + 8, total); i++) {
+                if (Math.random() > 0.6) visibleBars.push(this._glitchBars[i]);
+            }
+            this._clipDrawImgMask(visibleBars);
+        } else if (rawProgress < 0.5) {
             const target = Math.floor(total * rawProgress * 2);
             for (let i = 0; i < target; i++) this.drawBar(this._glitchBars[i]);
             for (let i = target; i < Math.min(target + 8, total); i++) {
@@ -1418,7 +1580,7 @@ class Strata {
     }
 
     runMotion7Animation() {
-        const elapsedTime = performance.now() - this.animationStartTime;
+        const elapsedTime = this.getElapsedTime();
         const cycleDuration = this.baseCycleDuration / this.animationSpeed;
         const currentCycle = Math.floor(elapsedTime / cycleDuration);
 
@@ -1442,6 +1604,20 @@ class Strata {
         this.scheduleNextFrame();
     }
 
+    // Clip pixelCtx to all bar shapes in the array and draw nextImg through them in one pass.
+    // Used by all imgMask animation paths for guaranteed-visible rendering.
+    _clipDrawImgMask(bars) {
+        if (!bars || bars.length === 0) return;
+        const n = this.images.length;
+        const nextImg = this.images[(this.currentImageIndex + 1) % n].img;
+        this.pixelCtx.save();
+        this.pixelCtx.beginPath();
+        for (const bar of bars) this.pixelCtx.rect(bar.x, bar.y, bar.width, bar.height);
+        this.pixelCtx.clip();
+        this.drawImageToContext(this.pixelCtx, nextImg);
+        this.pixelCtx.restore();
+    }
+
     drawBar(bar) {
         if (this.reverseMaskEnabled && this.originalImage) {
             this.pixelCtx.save();
@@ -1457,44 +1633,111 @@ class Strata {
     }
 
     runMotion8Animation() {
-        const elapsedTime = performance.now() - this.animationStartTime;
+        const elapsedTime = this.getElapsedTime();
         const cycleDuration = this.baseCycleDuration / this.animationSpeed;
         const currentCycle = Math.floor(elapsedTime / cycleDuration);
         if (this.checkCycleAdvance(currentCycle)) return;
-
-        this.clearCanvasBackground();
 
         const rawProgress = (elapsedTime % cycleDuration) / cycleDuration;
         const totalBars = this.motionBarOrder.length;
         const waveWidth = 0.15;
 
-        // Phase 1 (0→0.5): pixelated → clear bar by bar
-        // Phase 2 (0.5→1): clear → pixelated bar by bar
-        const revealing = rawProgress <= 0.5;
-        const phaseProgress = revealing ? rawProgress * 2 : (rawProgress - 0.5) * 2;
+        this.clearCanvasBackground();
 
-        for (let i = 0; i < totalBars; i++) {
-            const bar = this.motionBarOrder[i];
-            const barPos = i / totalBars;
-            const t = (phaseProgress - barPos) / waveWidth;
-            const clearAlpha = revealing
-                ? Math.max(0, Math.min(1, t))
-                : Math.max(0, Math.min(1, 1 - t));
+        if (this.imgMaskActive()) {
+            // IMG MASK: next image sweeps in as pixelated bars, then bars go clear (reveal photo)
+            // Phase 1 (0→0.5): bars appear bar-by-bar (pixelated)
+            // Phase 2 (0.5→1): each bar transitions from pixelated → clear next image photo
+            const appearProgress = Math.min(1.0, rawProgress * 2);
+            const revealProgress = rawProgress > 0.5 ? (rawProgress - 0.5) * 2 : 0;
+            const nextImg = this.images[(this.currentImageIndex + 1) % this.images.length].img;
 
-            // Always draw pixelated color as the "from" state regardless of mask mode
-            this.pixelCtx.fillStyle = `rgb(${bar.r},${bar.g},${bar.b})`;
-            this.pixelCtx.fillRect(bar.x, bar.y, bar.width, bar.height);
+            for (let i = 0; i < totalBars; i++) {
+                const bar = this.motionBarOrder[i];
+                const barPos = i / totalBars;
 
-            // Overlay clear image clipped to bar at clearAlpha
-            if (clearAlpha > 0 && this.originalImage) {
-                this.pixelCtx.save();
-                this.pixelCtx.beginPath();
-                this.pixelCtx.rect(bar.x, bar.y, bar.width, bar.height);
-                this.pixelCtx.clip();
-                this.pixelCtx.globalAlpha = clearAlpha;
-                this.drawOriginalImageToContext(this.pixelCtx);
-                this.pixelCtx.globalAlpha = 1.0;
-                this.pixelCtx.restore();
+                // Bar appears as appear wave sweeps past it
+                const tAppear = (appearProgress - barPos) / waveWidth;
+                const barAlpha = Math.max(0, Math.min(1, tAppear));
+                if (barAlpha <= 0) continue;
+
+                // In Phase 2: bar fades from pixelated to clear photo
+                const tReveal = (revealProgress - barPos) / waveWidth;
+                const clearAlpha = rawProgress > 0.5 ? Math.max(0, Math.min(1, tReveal)) : 0;
+
+                // Pixelated portion → draw next image clipped to bar (guaranteed visible)
+                const pixAlpha = barAlpha * (1 - clearAlpha);
+                if (pixAlpha > 0) {
+                    this.pixelCtx.save();
+                    this.pixelCtx.globalAlpha = pixAlpha;
+                    this.pixelCtx.beginPath();
+                    this.pixelCtx.rect(bar.x, bar.y, bar.width, bar.height);
+                    this.pixelCtx.clip();
+                    this.drawImageToContext(this.pixelCtx, nextImg);
+                    this.pixelCtx.restore();
+                }
+
+                // Clear photo portion (next image clipped to bar)
+                if (clearAlpha > 0) {
+                    this.pixelCtx.save();
+                    this.pixelCtx.beginPath();
+                    this.pixelCtx.rect(bar.x, bar.y, bar.width, bar.height);
+                    this.pixelCtx.clip();
+                    this.pixelCtx.globalAlpha = barAlpha * clearAlpha;
+                    this.drawImageToContext(this.pixelCtx, nextImg);
+                    this.pixelCtx.restore();
+                }
+            }
+            this.pixelCtx.globalAlpha = 1.0;
+            this.updateDisplay();
+            this.motionAnimationFrame++;
+            this.scheduleNextFrame();
+            return;
+        } else {
+            // Phase 1 (0→0.5): pixelated → clear bar by bar
+            // Phase 2 (0.5→1): clear → pixelated bar by bar (over new background image)
+            const revealing = rawProgress <= 0.5;
+            const phaseProgress = revealing ? rawProgress * 2 : (rawProgress - 0.5) * 2;
+
+            for (let i = 0; i < totalBars; i++) {
+                const bar = this.motionBarOrder[i];
+                const barPos = i / totalBars;
+                const t = (phaseProgress - barPos) / waveWidth;
+                const clearAlpha = revealing
+                    ? Math.max(0, Math.min(1, t))
+                    : Math.max(0, Math.min(1, 1 - t));
+
+                // Draw pixelated color as base
+                this.pixelCtx.fillStyle = `rgb(${bar.r},${bar.g},${bar.b})`;
+                this.pixelCtx.fillRect(bar.x, bar.y, bar.width, bar.height);
+
+                // SHOW IMAGE: blend background image over pixelated bar
+                if (this.backgroundImageEnabled && this.originalImage && clearAlpha < 1.0) {
+                    const bgOpacity = parseInt(document.getElementById('opacitySlider').value) / 100;
+                    const blendAlpha = bgOpacity * (1 - clearAlpha);
+                    if (blendAlpha > 0) {
+                        this.pixelCtx.save();
+                        this.pixelCtx.beginPath();
+                        this.pixelCtx.rect(bar.x, bar.y, bar.width, bar.height);
+                        this.pixelCtx.clip();
+                        this.pixelCtx.globalAlpha = blendAlpha;
+                        this.drawOriginalImageToContext(this.pixelCtx);
+                        this.pixelCtx.globalAlpha = 1.0;
+                        this.pixelCtx.restore();
+                    }
+                }
+
+                // Overlay clear image clipped to bar at clearAlpha
+                if (clearAlpha > 0 && this.originalImage) {
+                    this.pixelCtx.save();
+                    this.pixelCtx.beginPath();
+                    this.pixelCtx.rect(bar.x, bar.y, bar.width, bar.height);
+                    this.pixelCtx.clip();
+                    this.pixelCtx.globalAlpha = clearAlpha;
+                    this.drawOriginalImageToContext(this.pixelCtx);
+                    this.pixelCtx.globalAlpha = 1.0;
+                    this.pixelCtx.restore();
+                }
             }
         }
 
@@ -1506,12 +1749,17 @@ class Strata {
     updateDisplay() {
         this.pixelCanvas.style.display = 'block';
         this.canvas.style.display = 'block';
-        
-        // Update video canvas if recording
-        if (this.isRecording && this.videoCanvas) {
+
+        // During offline rendering: composite pixelCanvas → videoCtx so the offline loop
+        // can read it with getImageData and encode it. No encoding happens here.
+        if (this.offlineRenderTime !== null && this.videoCanvas) {
+            this._videoFrameUpdated = true; // tells the offline loop this frame was rendered
+
             this.videoCtx.clearRect(0, 0, this.videoCanvas.width, this.videoCanvas.height);
 
-            if (this.backgroundColorEnabled) {
+            if (this.imageMaskEnabled && this.images.length >= 2) {
+                // Image mask: full composite is already on pixelCanvas — just copy it
+            } else if (this.backgroundColorEnabled) {
                 this.videoCtx.fillStyle = this.backgroundColor;
                 this.videoCtx.fillRect(0, 0, this.videoCanvas.width, this.videoCanvas.height);
             }
@@ -1524,26 +1772,34 @@ class Strata {
             }
 
             this.videoCtx.drawImage(this.pixelCanvas, 0, 0);
-
-            // Capture frame for H.264 MP4 encoder
-            if (this.h264Encoder) {
-                const imgData = this.videoCtx.getImageData(0, 0, this.videoCanvas.width, this.videoCanvas.height);
-                this.h264Encoder.addFrameRgba(imgData.data);
-                this.videoFrameCount++;
-            }
+            // Encoding is done by _runOfflineRender after this call returns.
         }
     }
 
     scheduleNextFrame() {
+        if (this.offlineRenderTime !== null) return; // offline loop drives frames itself
         this.motionAnimationRequestId = requestAnimationFrame(() => this.runMotionAnimation());
     }
 
     clearCanvasBackground() {
         const { width, height } = this.canvas;
         this.pixelCtx.clearRect(0, 0, width, height);
-        // Always fill a solid base so the original image on this.canvas never bleeds through
-        this.pixelCtx.fillStyle = this.backgroundColorEnabled ? this.backgroundColor : '#000000';
-        this.pixelCtx.fillRect(0, 0, width, height);
+
+        if (this.imageMaskEnabled && this.images.length >= 2) {
+            if (this.motionAnimationRunning) {
+                // Animation: background = current image being covered by incoming bars
+                this.drawImageToContext(this.pixelCtx, this.images[this.currentImageIndex].img);
+            } else {
+                // Static display: background = next image (original IMG MASK behaviour)
+                const n = this.images.length;
+                this.drawImageToContext(this.pixelCtx, this.images[(this.currentImageIndex + 1) % n].img);
+            }
+        } else {
+            // Always fill a solid base so the original image on this.canvas never bleeds through
+            this.pixelCtx.fillStyle = this.backgroundColorEnabled ? this.backgroundColor : '#000000';
+            this.pixelCtx.fillRect(0, 0, width, height);
+        }
+
         if (this.backgroundImageEnabled && this.originalImage) {
             const opacity = parseInt(document.getElementById('opacitySlider').value) / 100;
             this.pixelCtx.globalAlpha = opacity;
@@ -1589,11 +1845,10 @@ class Strata {
             alert('Please upload an image first');
             return;
         }
-
         if (this.isRecording) {
-            this.stopVideoRecording();
+            this.stopVideoRecording(); // stop live preview → trigger offline render + download
         } else {
-            this.startVideoRecording();
+            this.startVideoRecording(); // start live preview (no encoding yet)
         }
     }
 
@@ -1612,65 +1867,155 @@ class Strata {
         });
     }
 
-    async startVideoRecording() {
+    // Phase 1: Start live animation preview — NO encoding happens here,
+    // so the preview runs at full speed with zero recording overhead.
+    startVideoRecording() {
+        if (this.isRecording) return;
+
+        this.isRecording        = true;
+        this.recordingStartTime = performance.now();
+
+        const btn = document.getElementById('videoDownloadBtn');
+        btn.classList.add('recording');
+
+        // Start normal live animation
+        this.startMotionAnimation();
+
+        // Save the seeds set by startMotionAnimation so the offline render can
+        // reproduce the same visual sequence the user watched.
+        this._recordedRandomStartPhase = this._randomStartPhase;
+        this._recordedRandomPeaks      = this._randomPeaks;
+        this._recordedStartImageIndex  = this.currentImageIndex;
+    }
+
+    // Phase 2 (triggered when user presses the button again):
+    // Stop the live preview, then encode the exact same duration offline.
+    // The offline render uses synthetic time so video speed = preview speed.
+    async stopVideoRecording() {
+        if (!this.isRecording) return;
+
+        const duration    = performance.now() - this.recordingStartTime;
+        this.isRecording  = false;
+
+        const btn = document.getElementById('videoDownloadBtn');
+        btn.classList.remove('recording');
+
+        // Stop live animation — this also calls processImage() to show a still frame
+        this.stopMotionAnimation();
+
+        if (duration < 300) return; // too short to encode
+
+        btn.disabled  = true;
+        btn.textContent = 'RENDERING…';
+
         try {
-            if (this.isRecording) return;
-
-            const btn = document.getElementById('videoDownloadBtn');
-            btn.disabled = true;
-            btn.textContent = 'LOADING…';
             const ready = await this.waitForHME();
-            btn.disabled = false;
-            btn.textContent = 'VIDEO ↓';
-
             if (!ready) {
                 alert('MP4 encoder failed to load. Please check your internet connection and refresh the page.');
                 return;
             }
 
+            const fps         = 30;
             const finalWidth  = this.pixelCanvas.width  % 2 === 0 ? this.pixelCanvas.width  : this.pixelCanvas.width  - 1;
             const finalHeight = this.pixelCanvas.height % 2 === 0 ? this.pixelCanvas.height : this.pixelCanvas.height - 1;
 
-            this.videoCanvas = document.createElement('canvas');
+            this.videoCanvas        = document.createElement('canvas');
             this.videoCanvas.width  = finalWidth;
             this.videoCanvas.height = finalHeight;
-            this.videoCtx = this.videoCanvas.getContext('2d');
+            this.videoCtx           = this.videoCanvas.getContext('2d');
 
             this.h264Encoder = await HME.createH264MP4Encoder();
             this.h264Encoder.width                 = finalWidth;
             this.h264Encoder.height                = finalHeight;
-            this.h264Encoder.frameRate             = 30;
+            this.h264Encoder.frameRate             = fps;
             this.h264Encoder.quantizationParameter = 15;
             this.h264Encoder.initialize();
 
-            this.videoFrameCount      = 0;
-            this.isRecording          = true;
-            this.isProcessingDownload = false;
+            this.videoFrameCount = 0;
 
-            document.getElementById('videoDownloadBtn').classList.add('recording');
-            this.startMotionAnimation();
+            // Render exactly as many frames as the user watched
+            const totalFrames = Math.ceil(duration * fps / 1000);
+            await this._runOfflineRender(fps, totalFrames);
+            await this._finalizeVideo();
 
         } catch (error) {
-            console.error('Error starting video recording:', error);
-            alert('Failed to start video recording: ' + error.message);
+            console.error('Error in video processing:', error);
+            alert('Failed to create video: ' + error.message);
+        } finally {
             this.resetVideoState();
         }
     }
 
-    stopVideoRecording() {
-        if (!this.isRecording) return;
+    // Offline frame-by-frame rendering loop.
+    // Sets synthetic animation time (offlineRenderTime) for each frame so the
+    // encoder receives exactly `fps` frames per real animation second — speed matches preview.
+    async _runOfflineRender(fps, totalFrames) {
+        const frameDuration = 1000 / fps;
 
-        this.isRecording = false;
-        document.getElementById('videoDownloadBtn').classList.remove('recording');
-        if (this.motionAnimationRunning) this.stopMotionAnimation();
+        // Restore the state from the start of the user's recording session
+        this.currentImageIndex = this._recordedStartImageIndex;
+        this.originalImage     = this.images[this.currentImageIndex].img;
+        this.setupCanvas(this.originalImage);
 
-        if (!this.h264Encoder) return;
+        // Initialise animation state (mirrors startMotionAnimation, but uses synthetic time)
+        this.motionAnimationRunning = true;
+        this.prepareMotionBarOrder();
+        this.motionAnimationFrame = 0;
+        this.animationStartTime   = 0; // unused — getElapsedTime() reads offlineRenderTime
+        this._impulseCycle        = -1;
+        this._glitchCycle         = -1;
+        this.lastWaveCycle        = -1;
+        this.lastCycleNumber      = -1;
+        // Restore same random seeds the user saw during live preview
+        this._randomStartPhase    = this._recordedRandomStartPhase;
+        this._randomPeaks         = this._recordedRandomPeaks;
+        this.clearCanvasBackground();
 
+        this.offlineTimeBase   = 0;
+        this.offlineRenderTime = 0;
+
+        for (let f = 0; f < totalFrames; f++) {
+            this.offlineRenderTime  = f * frameDuration;
+            this._videoFrameUpdated = false;
+
+            // Render one frame (draws to pixelCtx, updateDisplay copies to videoCtx)
+            this.runMotionAnimation();
+
+            // If checkCycleAdvance triggered an early return, updateDisplay was skipped —
+            // manually copy the freshly-cleared background to videoCtx for that frame.
+            if (!this._videoFrameUpdated && this.videoCanvas) {
+                this.videoCtx.clearRect(0, 0, this.videoCanvas.width, this.videoCanvas.height);
+                this.videoCtx.drawImage(this.pixelCanvas, 0, 0);
+            }
+
+            // Encode frame
+            if (this.h264Encoder && this.videoCanvas) {
+                const imgData = this.videoCtx.getImageData(0, 0, this.videoCanvas.width, this.videoCanvas.height);
+                this.h264Encoder.addFrameRgba(imgData.data);
+                this.videoFrameCount++;
+            }
+
+            // Yield to the UI thread every 15 frames to keep the page responsive
+            if (f % 15 === 0) await new Promise(r => setTimeout(r, 0));
+        }
+
+        this.offlineRenderTime      = null;
+        this.motionAnimationRunning = false;
+
+        // Restore still-image display (same image the user was on before recording)
+        this.currentImageIndex = this._recordedStartImageIndex;
+        this.originalImage     = this.images[this.currentImageIndex].img;
+        this.processImage();
+    }
+
+    async _finalizeVideo() {
+        const btn = document.getElementById('videoDownloadBtn');
+        btn.textContent = 'SAVING…';
         try {
-            if (this.videoFrameCount === 0) throw new Error('No frames captured — try recording for at least 1 second.');
+            if (this.videoFrameCount === 0) throw new Error('No frames were captured.');
 
             this.h264Encoder.finalize();
-            const uint8 = this.h264Encoder.FS.readFile(this.h264Encoder.outputFilename);
+            const uint8    = this.h264Encoder.FS.readFile(this.h264Encoder.outputFilename);
             const blob     = new Blob([uint8], { type: 'video/mp4' });
             const filename = `strata-animation-${Date.now()}.mp4`;
             const url      = URL.createObjectURL(blob);
@@ -1685,14 +2030,22 @@ class Strata {
             console.error('Error saving MP4:', error);
             alert('Failed to save video: ' + error.message);
         }
-
-        this.resetVideoState();
     }
 
     resetVideoState() {
         this.isRecording          = false;
         this.isProcessingDownload = false;
         this.videoFrameCount      = 0;
+        this.offlineRenderTime    = null;
+        this.offlineTimeBase      = 0;
+
+        if (this.motionAnimationRunning) {
+            this.motionAnimationRunning = false;
+            if (this.motionAnimationRequestId) {
+                cancelAnimationFrame(this.motionAnimationRequestId);
+                this.motionAnimationRequestId = null;
+            }
+        }
 
         if (this.h264Encoder) {
             try { this.h264Encoder.delete(); } catch (e) {}
@@ -1704,7 +2057,10 @@ class Strata {
             this.videoCtx    = null;
         }
 
-        document.getElementById('videoDownloadBtn').classList.remove('recording');
+        const btn = document.getElementById('videoDownloadBtn');
+        btn.classList.remove('recording');
+        btn.disabled    = false;
+        btn.textContent = 'VIDEO ↓';
     }
 
     isValidImageFile(file) {
@@ -1780,6 +2136,7 @@ class Strata {
         this.backgroundImageEnabled = false;
         this.backgroundColorEnabled = false;
         this.reverseMaskEnabled = false;
+        this.imageMaskEnabled = false;
         
         // Update background removal UI
         const backgroundRemovalBtn = document.getElementById('backgroundRemovalBtn');
@@ -1803,6 +2160,13 @@ class Strata {
         const reverseMaskBtn = document.getElementById('reverseMaskBtn');
         reverseMaskBtn.textContent = 'MASK: OFF';
         reverseMaskBtn.classList.remove('active');
+
+        // Update image mask UI
+        const imageMaskBtn = document.getElementById('imageMaskBtn');
+        if (imageMaskBtn) {
+            imageMaskBtn.textContent = 'IMG MASK: OFF';
+            imageMaskBtn.classList.remove('active');
+        }
         
         // Update UI elements with default values
         document.getElementById('sizeSlider').value = this.defaultSettings.pixelSize;
@@ -2332,6 +2696,67 @@ class Strata {
         this.reverseMaskEnabled = !this.reverseMaskEnabled;
         this.updateToggleBtn(this.reverseMaskEnabled, 'reverseMaskBtn', 'MASK');
         if (this.originalImage) this.processImage();
+    }
+
+    toggleImageMask() {
+        this.imageMaskEnabled = !this.imageMaskEnabled;
+        this.updateToggleBtn(this.imageMaskEnabled, 'imageMaskBtn', 'IMG MASK');
+        if (this.originalImage) this.processImage();
+    }
+
+    // True when IMG MASK is on and a second image is available
+    imgMaskActive() {
+        return this.imageMaskEnabled && this.images.length >= 2;
+    }
+
+    // Show/hide the IMG MASK button depending on image count
+    updateImageMaskBtnVisibility() {
+        const card = document.getElementById('imageMaskCard');
+        if (card) card.style.display = this.images.length >= 2 ? 'block' : 'none';
+        // Auto-disable if dropped back to 1 image
+        if (this.images.length < 2 && this.imageMaskEnabled) {
+            this.imageMaskEnabled = false;
+            const btn = document.getElementById('imageMaskBtn');
+            if (btn) {
+                btn.textContent = 'IMG MASK: OFF';
+                btn.classList.remove('active');
+            }
+            if (this.originalImage) this.processImage();
+        }
+    }
+
+    // Draw any image to a context (respects current aspect ratio setting)
+    drawImageToContext(ctx, image, targetWidth = null, targetHeight = null) {
+        if (!image) return;
+        if (targetWidth === null) targetWidth = ctx.canvas.width;
+        if (targetHeight === null) targetHeight = ctx.canvas.height;
+
+        if (this.aspectRatio === 'original') {
+            const scaleX = targetWidth / image.width;
+            const scaleY = targetHeight / image.height;
+            const scale = Math.min(scaleX, scaleY);
+            const drawWidth = image.width * scale;
+            const drawHeight = image.height * scale;
+            const drawX = (targetWidth - drawWidth) / 2;
+            const drawY = (targetHeight - drawHeight) / 2;
+            ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+        } else {
+            const imgAspect = image.width / image.height;
+            const targetAspect = targetWidth / targetHeight;
+            let sourceWidth, sourceHeight, sourceX, sourceY;
+            if (imgAspect > targetAspect) {
+                sourceHeight = image.height;
+                sourceWidth = image.height * targetAspect;
+                sourceX = (image.width - sourceWidth) / 2;
+                sourceY = 0;
+            } else {
+                sourceWidth = image.width;
+                sourceHeight = image.width / targetAspect;
+                sourceX = 0;
+                sourceY = (image.height - sourceHeight) / 2;
+            }
+            ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+        }
     }
 
     processImage() {
