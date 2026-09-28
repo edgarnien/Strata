@@ -49,6 +49,7 @@ export function mountClips(root: HTMLElement, pickFiles: () => void): void {
     };
     el.addEventListener('pointerdown', (e) => {
       if ((e.target as HTMLElement).closest('.clip__remove')) return;
+      el.setPointerCapture(e.pointerId);
       pointerId = e.pointerId;
       startX = e.clientX;
       if (e.pointerType === 'touch') timer = window.setTimeout(() => begin(e), LONG_PRESS_MS);
@@ -77,7 +78,7 @@ export function mountClips(root: HTMLElement, pickFiles: () => void): void {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selected.set(index); }
       else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeImage(index); }
       else if (e.key === 'ArrowLeft' && index > 0) moveImage(index, index - 1);
-      else if (e.key === 'ArrowRight') moveImage(index, index + 1);
+      else if (e.key === 'ArrowRight' && index < images.get().length - 1) moveImage(index, index + 1);
     });
   };
 
@@ -85,6 +86,7 @@ export function mountClips(root: HTMLElement, pickFiles: () => void): void {
     if (dragging) return;
     const list = images.get();
     const sel = selected.get();
+    const hadFocus = root.contains(document.activeElement);
     root.hidden = list.length === 0;
     root.replaceChildren(
       ...list.map((img, i) => {
@@ -107,6 +109,7 @@ export function mountClips(root: HTMLElement, pickFiles: () => void): void {
       h('button', { class: 'clip clip--add', type: 'button', 'aria-label': 'Add images', onclick: pickFiles }, '+'),
     );
     markCurrent();
+    if (hadFocus) root.querySelector<HTMLElement>(`.clip[data-index="${sel}"]`)?.focus();
   };
 
   effect([images, selected, playing], render);
