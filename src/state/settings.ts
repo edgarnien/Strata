@@ -67,7 +67,8 @@ function browserStorage(): Storage | null {
 export function loadSettings(storage: Pick<Storage, 'getItem'> | null = browserStorage()): Settings {
   try {
     const raw = storage?.getItem(STORAGE_KEY);
-    return parseSettings(raw ? JSON.parse(raw) : null);
+    // IMG MASK is a per-session choice (legacy never persisted it)
+    return { ...parseSettings(raw ? JSON.parse(raw) : null), imgMask: false };
   } catch {
     return { ...DEFAULT_SETTINGS };
   }

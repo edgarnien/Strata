@@ -32,6 +32,13 @@ describe('load / save', () => {
     saveSettings({ ...DEFAULT_SETTINGS, loops: 7 }, store);
     expect(loadSettings(store).loops).toBe(7);
   });
+  it('never restores IMG MASK across a reload (per-session choice)', () => {
+    const store = memory();
+    saveSettings({ ...DEFAULT_SETTINGS, imgMask: true, loops: 4 }, store);
+    const loaded = loadSettings(store);
+    expect(loaded.imgMask).toBe(false);
+    expect(loaded.loops).toBe(4);
+  });
   it('survives broken JSON, throwing storage and missing storage', () => {
     expect(loadSettings({ getItem: () => '{nope' })).toEqual(DEFAULT_SETTINGS);
     expect(loadSettings({ getItem: () => { throw new Error('blocked'); } })).toEqual(DEFAULT_SETTINGS);
