@@ -1,0 +1,23 @@
+:root {
+  color-scheme: dark;
+  --bg: #141414;
+  --surface: #1b1b1b;
+  --surface-2: #232323;
+  --surface-3: #2c2c2c;
+  --stage: #0c0c0c;
+  --line: #262626;
+  --line-strong: #444;
+  --text: #fff;
+  --text-2: #bbb;
+  --text-3: #888;
+  --text-4: #555;
+  --warn: #ff8a73;
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-pill: 999px;
+  --font: Arial, Helvetica, sans-serif;
+  --mono: ui-monospace, Menlo, Consolas, monospace;
+  --label: 10px;
+  --sidebar-w: 280px;
+  --gutter: 16px;
+}
