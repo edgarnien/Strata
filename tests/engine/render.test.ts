@@ -39,8 +39,8 @@ describe('renderFrame', () => {
 
   it('IMG MASK with several clips reveals the next clip over the current one', () => {
     const calls = record((ctx) => renderFrame(ctx, scene(['a', 'b'], { imgMask: true }), 3));
-    expect(calls).not.toContain('fillRect 0 0 100 300 #000000 1.000');
-    expect(calls[1]).toMatch(/^drawImage a /);
+    expect(calls[1]).toBe('fillRect 0 0 100 300 #000000 1.000');
+    expect(calls[2]).toMatch(/^drawImage a /);
     expect(count(calls, 'drawImage b')).toBe(1);
   });
 
@@ -63,6 +63,7 @@ describe('renderStill', () => {
   });
   it('IMG MASK shows the next clip behind the strokes', () => {
     const calls = record((ctx) => renderStill(ctx, scene(['a', 'b'], { imgMask: true }), 0));
-    expect(calls[1]).toMatch(/^drawImage b /);
+    expect(calls[1]).toBe('fillRect 0 0 100 300 #000000 1.000');
+    expect(calls[2]).toMatch(/^drawImage b /);
   });
 });

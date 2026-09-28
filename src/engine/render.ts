@@ -43,13 +43,11 @@ export function sceneDuration(scene: Scene): number {
   return totalDuration({ imageCount: scene.layers.length, loops, speed });
 }
 
-function paintBase(ctx: Ctx2D, scene: Scene, image: ImageBitmap, black: boolean): void {
+function paintBase(ctx: Ctx2D, scene: Scene, image: ImageBitmap): void {
   const { width, height, fit } = scene;
   ctx.clearRect(0, 0, width, height);
-  if (black) {
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, width, height);
-  }
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, width, height);
   drawFitted(ctx, image, width, height, fit);
 }
 
@@ -63,7 +61,7 @@ export function renderFrame(ctx: Ctx2D, scene: Scene, t: number): number {
   const next = scene.layers[pos.nextImageIndex];
   const imgMask = imgMaskActive(scene);
 
-  paintBase(ctx, scene, cur.bitmap, !imgMask);
+  paintBase(ctx, scene, cur.bitmap);
   motionById(s.motion).draw(ctx, {
     width: scene.width,
     height: scene.height,
@@ -87,6 +85,6 @@ export function renderStill(ctx: Ctx2D, scene: Scene, index: number): void {
   if (n === 0) return;
   const i = Math.min(Math.max(0, index), n - 1);
   const imgMask = imgMaskActive(scene);
-  paintBase(ctx, scene, scene.layers[imgMask ? (i + 1) % n : i].bitmap, !imgMask);
+  paintBase(ctx, scene, scene.layers[imgMask ? (i + 1) % n : i].bitmap);
   fillBars(ctx, scene.layers[i].strokeBars, scene.settings.color);
 }
