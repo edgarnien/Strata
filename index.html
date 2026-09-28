@@ -33,8 +33,16 @@
                         <div class="mobile-card-label">Size</div>
                         <label class="slider-label">SIZE</label>
                         <div class="slider-container">
-                            <input type="range" id="sizeSlider" min="1" max="100" value="80" class="slider">
-                            <span id="sizeValue" class="slider-value">80</span>
+                            <input type="range" id="sizeSlider" min="25" max="100" value="80" class="slider">
+                        </div>
+                    </div>
+                </div>
+                <div class="mobile-card">
+                    <div class="slider-group">
+                        <div class="mobile-card-label">Stretch</div>
+                        <label class="slider-label">STRETCH</label>
+                        <div class="slider-container">
+                            <input type="range" id="stretchSlider" min="0" max="100" value="0" class="slider">
                         </div>
                     </div>
                 </div>
@@ -43,18 +51,7 @@
                         <div class="mobile-card-label">Threshold</div>
                         <label class="slider-label">THRESHOLD</label>
                         <div class="slider-container">
-                            <input type="range" id="thresholdSlider" min="0" max="100" value="0" class="slider">
-                            <span id="thresholdValue" class="slider-value">0</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="mobile-card">
-                    <div class="slider-group">
-                        <div class="mobile-card-label">Stretch</div>
-                        <label class="slider-label">STRETCH FACTOR</label>
-                        <div class="slider-container">
-                            <input type="range" id="stretchSlider" min="0" max="100" value="0" class="slider">
-                            <span id="stretchValue" class="slider-value">00</span>
+                            <input type="range" id="thresholdSlider" min="0" max="100" value="35" class="slider">
                         </div>
                     </div>
                 </div>
@@ -64,30 +61,25 @@
             <div class="section-label">BACKGROUND</div>
             <div class="mobile-section">
                 <div class="mobile-card">
-                    <div class="mobile-card-label">Remove Back</div>
-                    <button id="backgroundRemovalBtn" class="background-btn">REMOVE BACK: OFF</button>
+                    <div class="mobile-card-label">Remove</div>
+                    <div class="remove-toggle">
+                        <button id="backgroundRemovalBtn" class="background-btn active">REMOVE BACK</button>
+                        <button id="removeSwapBtn" class="swap-btn" title="Switch between back and front" aria-label="Switch between remove back and remove front">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/>
+                                <path d="M4 3v5h5"/>
+                                <path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/>
+                                <path d="M20 21v-5h-5"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-                <div class="mobile-card" id="sensitivityCard" style="display: none;">
+                <div class="mobile-card" id="sensitivityCard">
                     <div class="slider-group">
                         <div class="mobile-card-label">Sensitivity</div>
                         <label class="slider-label">SENSITIVITY</label>
                         <div class="slider-container">
-                            <input type="range" id="sensitivitySlider" min="10" max="100" value="30" class="slider">
-                            <span id="sensitivityValue" class="slider-value">30</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="mobile-card">
-                    <div class="mobile-card-label">Show Image</div>
-                    <button id="backgroundImageBtn" class="background-btn">SHOW IMAGE: OFF</button>
-                </div>
-                <div class="mobile-card" id="opacityCard" style="display: none;">
-                    <div class="slider-group">
-                        <div class="mobile-card-label">Opacity</div>
-                        <label class="slider-label">OPACITY</label>
-                        <div class="slider-container">
-                            <input type="range" id="opacitySlider" min="0" max="100" value="30" class="slider">
-                            <span id="opacityValue" class="slider-value">30</span>
+                            <input type="range" id="sensitivitySlider" min="10" max="100" value="50" class="slider">
                         </div>
                     </div>
                 </div>
@@ -96,21 +88,13 @@
             <!-- Color & Effects -->
             <div class="section-label">COLOR & EFFECTS</div>
             <div class="mobile-section">
-                <div class="mobile-card">
-                    <div class="mobile-card-label">Color</div>
-                    <button id="backgroundColorBtn" class="background-btn">COLOR: OFF</button>
-                </div>
-                <div class="mobile-card" id="colorCard" style="display: none;">
+                <div class="mobile-card" id="colorCard">
                     <div class="mobile-card-label">Hex Color</div>
                     <label class="slider-label">HEX COLOR</label>
                     <div class="color-input-container">
                         <input type="text" id="hexColorInput" class="hex-input" value="#FFFFFF" placeholder="#FFFFFF" maxlength="7">
                         <div id="colorPreview" class="color-preview" title="Click to open color wheel"></div>
                     </div>
-                </div>
-                <div class="mobile-card">
-                    <div class="mobile-card-label">Mask</div>
-                    <button id="reverseMaskBtn" class="background-btn">MASK: OFF</button>
                 </div>
                 <div class="mobile-card" id="imageMaskCard" style="display: none;">
                     <div class="mobile-card-label">Img Mask</div>
@@ -141,7 +125,6 @@
                             <label class="slider-label">SPEED</label>
                             <div class="slider-container">
                                 <input type="range" id="speedSlider" min="0.5" max="10" step="0.5" value="1" class="slider">
-                                <span id="speedValue" class="slider-value">1.0x</span>
                             </div>
                         </div>
                     </div>

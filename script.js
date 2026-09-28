@@ -16,9 +16,7 @@ class Strata {
         this.animationCycleCount = 0;
         this.lastCycleNumber = -1;
 
-        this.isColorMode = true;
-        this.backgroundRemovalEnabled = false;
-        this.backgroundImageEnabled = false;
+        this.removeFront = false;
         this.processingTimeout = null;
 
         // Motion animation state
@@ -37,10 +35,9 @@ class Strata {
         // Default settings for reset functionality
         this.defaultSettings = {
             pixelSize: 80,
-            threshold: 0,
+            threshold: 35,
             stretch: 0,
-            sensitivity: 30,
-            opacity: 30,
+            sensitivity: 50,
             motionType: 'motion1',
             speed: 1.0,
             aspectRatio: 'original',
@@ -66,11 +63,7 @@ class Strata {
         this._recordedStartImageIndex  = 0;
 
         // Background color state
-        this.backgroundColorEnabled = false;
         this.backgroundColor = '#FFFFFF';
-
-        // Reverse mask state
-        this.reverseMaskEnabled = false;
 
         // Image mask state (visible only with 2+ images)
         this.imageMaskEnabled = false;
@@ -78,7 +71,6 @@ class Strata {
         // Initialize other event listeners (isolated from upload)
         this.initializeEventListeners();
         this.initializeGallerySystem();
-        this.safeUpdateSliderValues();
 
         // Override browser form-state restoration — always start with defaults
         this.applyDefaultsToUI();
@@ -87,17 +79,10 @@ class Strata {
     applyDefaultsToUI() {
         const d = this.defaultSettings;
         document.getElementById('sizeSlider').value        = d.pixelSize;
-        document.getElementById('sizeValue').textContent   = d.pixelSize;
         document.getElementById('thresholdSlider').value   = d.threshold;
-        document.getElementById('thresholdValue').textContent = d.threshold;
         document.getElementById('stretchSlider').value     = d.stretch;
-        document.getElementById('stretchValue').textContent = d.stretch.toString().padStart(2, '0');
         document.getElementById('sensitivitySlider').value = d.sensitivity;
-        document.getElementById('sensitivityValue').textContent = d.sensitivity;
-        document.getElementById('opacitySlider').value     = d.opacity;
-        document.getElementById('opacityValue').textContent = d.opacity;
         document.getElementById('speedSlider').value       = d.speed;
-        document.getElementById('speedValue').textContent  = `${d.speed.toFixed(1)}x`;
         document.getElementById('motionTypeSelect').value  = d.motionType;
         document.getElementById('aspectRatioSelect').value = d.aspectRatio;
         document.getElementById('hexColorInput').value     = d.primaryColor;
@@ -668,6 +653,21 @@ class Strata {
                 }
             });
 
+            // Tap / click on drop zone opens file picker (essential for mobile)
+            if (dropZone) {
+                dropZone.addEventListener('click', (e) => {
+                    try {
+                        // Ignore clicks on the canvas, gallery overlay, or controls
+                        if (e.target.closest('#pixelCanvas') ||
+                            e.target.closest('#canvas') ||
+                            e.target.closest('#miniViewer')) return;
+                        fileInput.click();
+                    } catch (err) {
+                        console.error('Drop zone click error:', err);
+                    }
+                });
+            }
+
             // Drag and drop events (now supports multiple files)
             if (dropZone) {
                 dropZone.addEventListener('dragover', (e) => {
@@ -767,89 +767,33 @@ class Strata {
         }
     }
 
-    // Safe slider update that won't break other functionality
-    safeUpdateSliderValues() {
-        try {
-            const elements = {
-                sizeValue: document.getElementById('sizeValue'),
-                sizeSlider: document.getElementById('sizeSlider'),
-                thresholdValue: document.getElementById('thresholdValue'),
-                thresholdSlider: document.getElementById('thresholdSlider'),
-                stretchValue: document.getElementById('stretchValue'),
-                stretchSlider: document.getElementById('stretchSlider'),
-                sensitivityValue: document.getElementById('sensitivityValue'),
-                sensitivitySlider: document.getElementById('sensitivitySlider'),
-                opacityValue: document.getElementById('opacityValue'),
-                opacitySlider: document.getElementById('opacitySlider')
-            };
-
-            if (elements.sizeValue && elements.sizeSlider) {
-                elements.sizeValue.textContent = elements.sizeSlider.value;
-            }
-            if (elements.thresholdValue && elements.thresholdSlider) {
-                elements.thresholdValue.textContent = elements.thresholdSlider.value;
-            }
-            if (elements.stretchValue && elements.stretchSlider) {
-                elements.stretchValue.textContent = elements.stretchSlider.value.padStart(2, '0');
-            }
-            if (elements.sensitivityValue && elements.sensitivitySlider) {
-                elements.sensitivityValue.textContent = elements.sensitivitySlider.value;
-            }
-            if (elements.opacityValue && elements.opacitySlider) {
-                elements.opacityValue.textContent = elements.opacitySlider.value;
-            }
-        } catch (err) {
-            console.warn('Error updating slider values:', err);
-        }
-    }
-
     initializeEventListeners() {
         // File input and drag & drop - REMOVED (now in initializeUploadSystem)
 
         // Background removal toggle
-        this.safeAddEventListener('backgroundRemovalBtn', 'click', () => this.toggleBackgroundRemoval());
-
-        // Background image toggle
-        this.safeAddEventListener('backgroundImageBtn', 'click', () => this.toggleBackgroundImage());
+        this.safeAddEventListener('backgroundRemovalBtn', 'click', () => this.toggleRemoveSide());
+        this.safeAddEventListener('removeSwapBtn', 'click', () => this.toggleRemoveSide());
 
         // Sensitivity slider
         this.safeAddEventListener('sensitivitySlider', 'input', (e) => {
-            const valueEl = document.getElementById('sensitivityValue');
-            if (valueEl) valueEl.textContent = e.target.value;
             this.processImage();
-            this.saveCurrentSettings();
-        });
-
-        // Opacity slider
-        this.safeAddEventListener('opacitySlider', 'input', (e) => {
-            const valueEl = document.getElementById('opacityValue');
-            if (valueEl) valueEl.textContent = e.target.value;
-            if (this.backgroundImageEnabled) {
-                this.processImage();
-            }
             this.saveCurrentSettings();
         });
 
         // Size slider
         this.safeAddEventListener('sizeSlider', 'input', (e) => {
-            const valueEl = document.getElementById('sizeValue');
-            if (valueEl) valueEl.textContent = e.target.value;
             this.processImage();
             this.saveCurrentSettings();
         });
 
         // Threshold slider
         this.safeAddEventListener('thresholdSlider', 'input', (e) => {
-            const valueEl = document.getElementById('thresholdValue');
-            if (valueEl) valueEl.textContent = e.target.value;
             this.processImage();
             this.saveCurrentSettings();
         });
 
         // Stretch slider
         this.safeAddEventListener('stretchSlider', 'input', (e) => {
-            const valueEl = document.getElementById('stretchValue');
-            if (valueEl) valueEl.textContent = e.target.value.padStart(2, '0');
             this.processImage();
             this.saveCurrentSettings();
         });
@@ -878,8 +822,6 @@ class Strata {
         // Speed slider for animation
         this.safeAddEventListener('speedSlider', 'input', (e) => {
             this.animationSpeed = parseFloat(e.target.value);
-            const valueEl = document.getElementById('speedValue');
-            if (valueEl) valueEl.textContent = `${this.animationSpeed.toFixed(1)}x`;
             this.saveCurrentSettings();
         });
 
@@ -887,7 +829,6 @@ class Strata {
         this.safeAddEventListener('videoDownloadBtn', 'click', () => this.downloadMotionVideo());
 
         // Background color controls
-        this.safeAddEventListener('backgroundColorBtn', 'click', () => this.toggleBackgroundColor());
         this.safeAddEventListener('hexColorInput', 'input', (e) => {
             this.updateBackgroundColor(e.target.value);
             this.saveCurrentSettings();
@@ -916,9 +857,6 @@ class Strata {
                 console.warn('Color wheel close error:', err);
             }
         });
-
-        // Reverse mask control
-        this.safeAddEventListener('reverseMaskBtn', 'click', () => this.toggleReverseMask());
 
         // Image mask control (2nd image as mask)
         this.safeAddEventListener('imageMaskBtn', 'click', () => this.toggleImageMask());
@@ -1069,79 +1007,7 @@ class Strata {
             return; // ← skip normal sampling path; this.ctx is untouched
         }
 
-        // ── Normal path: sample colours from this.ctx (current image) ──
-        const imageData = this.ctx.getImageData(0, 0, width, height);
-        const data = imageData.data;
-
-        // Get background removal settings
-        const sensitivity = this.isColorMode && this.backgroundRemovalEnabled ?
-            parseInt(document.getElementById('sensitivitySlider').value) : 0;
-
-        // If background removal is enabled, detect dominant colors
-        let dominantColors = [];
-        if (this.isColorMode && this.backgroundRemovalEnabled) {
-            const corners = [
-                {x: 0, y: 0}, {x: width-1, y: 0},
-                {x: 0, y: height-1}, {x: width-1, y: height-1}
-            ];
-
-            for (let corner of corners) {
-                const index = (corner.y * width + corner.x) * 4;
-                dominantColors.push({
-                    r: data[index],
-                    g: data[index + 1],
-                    b: data[index + 2]
-                });
-            }
-        }
-
-        const bars = [];
-
-        // Only add bars that would actually be visible in the final image
-        for (let col = 0; col < numBarsHorizontally; col++) {
-            const x = Math.round(col * width / numBarsHorizontally);
-            const actualBarWidth = Math.round((col + 1) * width / numBarsHorizontally) - x;
-            for (let row = 0; row < numBarsVertically; row++) {
-                const y = Math.round(row * height / numBarsVertically);
-                const actualBarHeight = Math.round((row + 1) * height / numBarsVertically) - y;
-                // Sample a point in this area (same logic as in pixelateImage)
-                const sampleX = Math.min(x + Math.floor(actualBarWidth / 2), width - 1);
-                const sampleY = Math.min(y + Math.floor(actualBarHeight / 2), height - 1);
-                const index = (sampleY * width + sampleX) * 4;
-
-                let r = data[index] || 0;
-                let g = data[index + 1] || 0;
-                let b = data[index + 2] || 0;
-
-                // Apply the same filtering logic as in pixelateImage
-                if (!this.isColorMode) {
-                    const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-                    r = g = b = gray > threshold * 2.55 ? 255 : 0;
-                } else {
-                    // In colored mode, check for background removal
-                    if (this.backgroundRemovalEnabled && this.isBackgroundColor(r, g, b, sensitivity, dominantColors, x, y)) {
-                        continue; // Skip background colors - don't add to animation
-                    }
-
-                    r = r > threshold * 2.55 ? r : 0;
-                    g = g > threshold * 2.55 ? g : 0;
-                    b = b > threshold * 2.55 ? b : 0;
-                }
-
-                // Only add this bar if it would actually be visible (not black/transparent)
-                if (r !== 0 || g !== 0 || b !== 0) {
-                    bars.push({
-                        x: x,
-                        y: y,
-                        r: r,
-                        g: g,
-                        b: b,
-                        width: actualBarWidth,
-                        height: actualBarHeight
-                    });
-                }
-            }
-        }
+        const bars = this.selectStrokeBars(numBarsHorizontally, numBarsVertically, threshold);
 
         // Shuffle bars randomly
         for (let i = bars.length - 1; i > 0; i--) {
@@ -1343,10 +1209,12 @@ class Strata {
         const scatterWidth = 0.45;
 
         if (this.imgMaskActive()) {
-            // IMG MASK: one-way wave sweep — clip-window rendering
-            const wavePos = rawProgress < 0.5
-                ? 2 * rawProgress * rawProgress
-                : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
+            // IMG MASK: one-way wave sweep.
+            // wavePos is scaled past (1 + scatterWidth + max wave displacement) so ALL bars
+            // are guaranteed visible before rawProgress reaches 1.0. When the cycle then
+            // transitions (clearCanvasBackground draws Image 2 as the new background), the
+            // canvas is already fully Image 2 via clip-windows → zero visible hard cut.
+            const wavePos = Math.sin(rawProgress * Math.PI / 2) * (1 + scatterWidth + 0.25);
             const visibleBars = [];
             for (const bar of this.motionBarOrder) {
                 let along, perp;
@@ -1366,12 +1234,9 @@ class Strata {
             }
             this._clipDrawImgMask(visibleBars);
         } else {
-            // Phase 1 (0→0.5): bars emerge; Phase 2 (0.5→1): bars retreat
-            const advancing = rawProgress <= 0.5;
-            const phaseT = advancing ? rawProgress * 2 : (rawProgress - 0.5) * 2;
-            const wavePos = phaseT < 0.5
-                ? 2 * phaseT * phaseT
-                : 1 - Math.pow(-2 * phaseT + 2, 3) / 2;
+            // Sine arc 0→1→0 over the full cycle: no separate advance/retreat phases,
+            // no double-slow-zone at the midpoint, no abrupt jump.
+            const frontPos = Math.sin(rawProgress * Math.PI);
 
             for (const bar of this.motionBarOrder) {
                 let along, perp;
@@ -1388,7 +1253,6 @@ class Strata {
                 const hy = (bar.y * 19349663) >>> 0;
                 const barT = ((hx ^ hy) * 2654435761 >>> 0) / 0xFFFFFFFF;
 
-                const frontPos = advancing ? wavePos : 1 - wavePos;
                 if (barT < (frontPos - effectiveAlong) / scatterWidth) this.drawBar(bar);
             }
         }
@@ -1445,79 +1309,21 @@ class Strata {
             return;
         }
 
-        // ── Standard FADE: mask-canvas approach ──
-        this.pixelCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Base layer: original image at full opacity (what shows through bar holes)
-        if (this.originalImage) {
-            this.pixelCtx.globalAlpha = 1.0;
-            this.pixelCtx.globalCompositeOperation = 'source-over';
-            this.drawOriginalImageToContext(this.pixelCtx);
+        // ── Standard FADE: strokes fade in, then out, over the image ──
+        this.clearCanvasBackground();
+        const fadeIn = rawProgress <= 0.5;
+        const phase = fadeIn ? rawProgress * 2 : (rawProgress - 0.5) * 2;
+        for (let i = 0; i < totalBars; i++) {
+            const bar = this.motionBarOrder[i];
+            const pos = i / totalBars;
+            const alpha = fadeIn
+                ? Math.max(0, Math.min(1, 1 - (pos - phase) / 0.2))
+                : Math.max(0, Math.min(1, (pos - phase) / 0.2));
+            if (alpha <= 0) continue;
+            this.pixelCtx.globalAlpha = alpha;
+            this.drawBar(bar);
         }
-
-        // Mask canvas: overlayColor fills non-hole areas
-        const maskCanvas = document.createElement('canvas');
-        maskCanvas.width = this.canvas.width;
-        maskCanvas.height = this.canvas.height;
-        const maskCtx = maskCanvas.getContext('2d');
-
-        const overlayColor = this.backgroundColorEnabled ? this.backgroundColor : '#000000';
-        maskCtx.fillStyle = overlayColor;
-        maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
-
-        // SHOW IMAGE: draw original image at reduced opacity on mask (visible in non-hole areas)
-        if (this.backgroundImageEnabled && this.originalImage) {
-            const opacity = parseInt(document.getElementById('opacitySlider').value) / 100;
-            maskCtx.globalAlpha = opacity;
-            this.drawImageToContext(maskCtx, this.originalImage);
-            maskCtx.globalAlpha = 1.0;
-        }
-
-        // Cut holes where bars are visible (destination-out removes mask pixels)
-        maskCtx.globalCompositeOperation = 'destination-out';
-
-        if (rawProgress <= 0.5) {
-            // FADE IN: bars open up as windows
-            const fadeInProgress = rawProgress * 2;
-            for (let i = 0; i < totalBars; i++) {
-                const bar = this.motionBarOrder[i];
-                const barPosition = i / totalBars;
-                let cutoutOpacity;
-                if (barPosition <= fadeInProgress) {
-                    cutoutOpacity = 1.0;
-                } else if (barPosition <= fadeInProgress + 0.2) {
-                    cutoutOpacity = 1.0 - (barPosition - fadeInProgress) / 0.2;
-                } else {
-                    continue;
-                }
-                maskCtx.globalAlpha = cutoutOpacity;
-                maskCtx.fillStyle = '#FFFFFF';
-                maskCtx.fillRect(bar.x, bar.y, bar.width, bar.height);
-            }
-        } else {
-            // FADE OUT: bars close back up
-            const fadeOutProgress = (rawProgress - 0.5) * 2;
-            for (let i = 0; i < totalBars; i++) {
-                const bar = this.motionBarOrder[i];
-                const barPosition = i / totalBars;
-                let cutoutOpacity;
-                if (barPosition <= fadeOutProgress) {
-                    continue;
-                } else if (barPosition <= fadeOutProgress + 0.2) {
-                    cutoutOpacity = (barPosition - fadeOutProgress) / 0.2;
-                } else {
-                    cutoutOpacity = 1.0;
-                }
-                maskCtx.globalAlpha = cutoutOpacity;
-                maskCtx.fillStyle = '#FFFFFF';
-                maskCtx.fillRect(bar.x, bar.y, bar.width, bar.height);
-            }
-        }
-
-        // Draw mask on top of the base image
         this.pixelCtx.globalAlpha = 1.0;
-        this.pixelCtx.globalCompositeOperation = 'source-over';
-        this.pixelCtx.drawImage(maskCanvas, 0, 0);
 
         this.updateDisplay();
         this.motionAnimationFrame++;
@@ -1619,17 +1425,8 @@ class Strata {
     }
 
     drawBar(bar) {
-        if (this.reverseMaskEnabled && this.originalImage) {
-            this.pixelCtx.save();
-            this.pixelCtx.beginPath();
-            this.pixelCtx.rect(bar.x, bar.y, bar.width, bar.height);
-            this.pixelCtx.clip();
-            this.drawOriginalImageToContext(this.pixelCtx);
-            this.pixelCtx.restore();
-        } else {
-            this.pixelCtx.fillStyle = `rgb(${bar.r},${bar.g},${bar.b})`;
-            this.pixelCtx.fillRect(bar.x, bar.y, bar.width, bar.height);
-        }
+        this.pixelCtx.fillStyle = this.backgroundColor;
+        this.pixelCtx.fillRect(bar.x, bar.y, bar.width, bar.height);
     }
 
     runMotion8Animation() {
@@ -1707,25 +1504,8 @@ class Strata {
                     ? Math.max(0, Math.min(1, t))
                     : Math.max(0, Math.min(1, 1 - t));
 
-                // Draw pixelated color as base
-                this.pixelCtx.fillStyle = `rgb(${bar.r},${bar.g},${bar.b})`;
+                this.pixelCtx.fillStyle = this.backgroundColor;
                 this.pixelCtx.fillRect(bar.x, bar.y, bar.width, bar.height);
-
-                // SHOW IMAGE: blend background image over pixelated bar
-                if (this.backgroundImageEnabled && this.originalImage && clearAlpha < 1.0) {
-                    const bgOpacity = parseInt(document.getElementById('opacitySlider').value) / 100;
-                    const blendAlpha = bgOpacity * (1 - clearAlpha);
-                    if (blendAlpha > 0) {
-                        this.pixelCtx.save();
-                        this.pixelCtx.beginPath();
-                        this.pixelCtx.rect(bar.x, bar.y, bar.width, bar.height);
-                        this.pixelCtx.clip();
-                        this.pixelCtx.globalAlpha = blendAlpha;
-                        this.drawOriginalImageToContext(this.pixelCtx);
-                        this.pixelCtx.globalAlpha = 1.0;
-                        this.pixelCtx.restore();
-                    }
-                }
 
                 // Overlay clear image clipped to bar at clearAlpha
                 if (clearAlpha > 0 && this.originalImage) {
@@ -1756,21 +1536,6 @@ class Strata {
             this._videoFrameUpdated = true; // tells the offline loop this frame was rendered
 
             this.videoCtx.clearRect(0, 0, this.videoCanvas.width, this.videoCanvas.height);
-
-            if (this.imageMaskEnabled && this.images.length >= 2) {
-                // Image mask: full composite is already on pixelCanvas — just copy it
-            } else if (this.backgroundColorEnabled) {
-                this.videoCtx.fillStyle = this.backgroundColor;
-                this.videoCtx.fillRect(0, 0, this.videoCanvas.width, this.videoCanvas.height);
-            }
-
-            if (this.backgroundImageEnabled && this.originalImage) {
-                const opacity = parseInt(document.getElementById('opacitySlider').value) / 100;
-                this.videoCtx.globalAlpha = opacity;
-                this.videoCtx.drawImage(this.originalImage, 0, 0, this.videoCanvas.width, this.videoCanvas.height);
-                this.videoCtx.globalAlpha = 1.0;
-            }
-
             this.videoCtx.drawImage(this.pixelCanvas, 0, 0);
             // Encoding is done by _runOfflineRender after this call returns.
         }
@@ -1795,16 +1560,9 @@ class Strata {
                 this.drawImageToContext(this.pixelCtx, this.images[(this.currentImageIndex + 1) % n].img);
             }
         } else {
-            // Always fill a solid base so the original image on this.canvas never bleeds through
-            this.pixelCtx.fillStyle = this.backgroundColorEnabled ? this.backgroundColor : '#000000';
+            this.pixelCtx.fillStyle = '#000000';
             this.pixelCtx.fillRect(0, 0, width, height);
-        }
-
-        if (this.backgroundImageEnabled && this.originalImage) {
-            const opacity = parseInt(document.getElementById('opacitySlider').value) / 100;
-            this.pixelCtx.globalAlpha = opacity;
-            this.drawOriginalImageToContext(this.pixelCtx);
-            this.pixelCtx.globalAlpha = 1.0;
+            if (this.originalImage) this.drawOriginalImageToContext(this.pixelCtx);
         }
     }
 
@@ -2079,7 +1837,6 @@ class Strata {
             threshold: parseInt(document.getElementById('thresholdSlider').value),
             stretch: parseInt(document.getElementById('stretchSlider').value),
             sensitivity: parseInt(document.getElementById('sensitivitySlider').value),
-            opacity: parseInt(document.getElementById('opacitySlider').value),
             motionType: document.getElementById('motionTypeSelect').value,
             speed: parseFloat(document.getElementById('speedSlider').value),
             aspectRatio: document.getElementById('aspectRatioSelect').value,
@@ -2100,19 +1857,10 @@ class Strata {
                 document.getElementById('thresholdSlider').value = settings.threshold || this.defaultSettings.threshold;
                 document.getElementById('stretchSlider').value = settings.stretch || this.defaultSettings.stretch;
                 document.getElementById('sensitivitySlider').value = settings.sensitivity || this.defaultSettings.sensitivity;
-                document.getElementById('opacitySlider').value = settings.opacity || this.defaultSettings.opacity;
                 document.getElementById('motionTypeSelect').value = settings.motionType || this.defaultSettings.motionType;
                 document.getElementById('speedSlider').value = settings.speed || this.defaultSettings.speed;
                 document.getElementById('aspectRatioSelect').value = settings.aspectRatio || this.defaultSettings.aspectRatio;
                 document.getElementById('hexColorInput').value = settings.primaryColor || this.defaultSettings.primaryColor;
-                
-                // Update corresponding display elements
-                document.getElementById('sizeValue').textContent = settings.pixelSize || this.defaultSettings.pixelSize;
-                document.getElementById('thresholdValue').textContent = settings.threshold || this.defaultSettings.threshold;
-                document.getElementById('stretchValue').textContent = (settings.stretch || this.defaultSettings.stretch).toString().padStart(2, '0');
-                document.getElementById('sensitivityValue').textContent = settings.sensitivity || this.defaultSettings.sensitivity;
-                document.getElementById('opacityValue').textContent = settings.opacity || this.defaultSettings.opacity;
-                document.querySelector('#speedValue').textContent = `${(settings.speed || this.defaultSettings.speed).toFixed(1)}x`;
                 
                 // Sync JS state from saved values
                 this.motionType = settings.motionType || this.defaultSettings.motionType;
@@ -2131,36 +1879,12 @@ class Strata {
     }
 
     resetSettings() {
-        // Reset all toggle button states to OFF
-        this.backgroundRemovalEnabled = false;
-        this.backgroundImageEnabled = false;
-        this.backgroundColorEnabled = false;
-        this.reverseMaskEnabled = false;
+        this.removeFront = false;
         this.imageMaskEnabled = false;
         
-        // Update background removal UI
-        const backgroundRemovalBtn = document.getElementById('backgroundRemovalBtn');
-        backgroundRemovalBtn.textContent = 'REMOVE BACK: OFF';
-        backgroundRemovalBtn.classList.remove('active');
-        document.getElementById('sensitivityCard').style.display = 'none';
+        document.getElementById('backgroundRemovalBtn').textContent = 'REMOVE BACK';
         
-        // Update background image UI
-        const backgroundImageBtn = document.getElementById('backgroundImageBtn');
-        backgroundImageBtn.textContent = 'SHOW IMAGE: OFF';
-        backgroundImageBtn.classList.remove('active');
-        document.getElementById('opacityCard').style.display = 'none';
         
-        // Update background color UI
-        const backgroundColorBtn = document.getElementById('backgroundColorBtn');
-        backgroundColorBtn.textContent = 'COLOR: OFF';
-        backgroundColorBtn.classList.remove('active');
-        document.getElementById('colorCard').style.display = 'none';
-        
-        // Update reverse mask UI
-        const reverseMaskBtn = document.getElementById('reverseMaskBtn');
-        reverseMaskBtn.textContent = 'MASK: OFF';
-        reverseMaskBtn.classList.remove('active');
-
         // Update image mask UI
         const imageMaskBtn = document.getElementById('imageMaskBtn');
         if (imageMaskBtn) {
@@ -2173,19 +1897,10 @@ class Strata {
         document.getElementById('thresholdSlider').value = this.defaultSettings.threshold;
         document.getElementById('stretchSlider').value = this.defaultSettings.stretch;
         document.getElementById('sensitivitySlider').value = this.defaultSettings.sensitivity;
-        document.getElementById('opacitySlider').value = this.defaultSettings.opacity;
         document.getElementById('motionTypeSelect').value = this.defaultSettings.motionType;
         document.getElementById('speedSlider').value = this.defaultSettings.speed;
         document.getElementById('aspectRatioSelect').value = this.defaultSettings.aspectRatio;
         document.getElementById('hexColorInput').value = this.defaultSettings.primaryColor;
-        
-        // Update corresponding display elements
-        document.getElementById('sizeValue').textContent = this.defaultSettings.pixelSize;
-        document.getElementById('thresholdValue').textContent = this.defaultSettings.threshold;
-        document.getElementById('stretchValue').textContent = this.defaultSettings.stretch.toString().padStart(2, '0');
-        document.getElementById('sensitivityValue').textContent = this.defaultSettings.sensitivity;
-        document.getElementById('opacityValue').textContent = this.defaultSettings.opacity;
-        document.querySelector('#speedValue').textContent = `${this.defaultSettings.speed.toFixed(1)}x`;
         
         // Sync JS state back to defaults
         this.motionType = this.defaultSettings.motionType;
@@ -2333,21 +2048,9 @@ class Strata {
         }
     }
 
-    toggleBackgroundRemoval() {
-        this.backgroundRemovalEnabled = !this.backgroundRemovalEnabled;
-        this.updateToggleBtn(this.backgroundRemovalEnabled, 'backgroundRemovalBtn', 'REMOVE BACK', 'sensitivityCard');
-        if (this.originalImage) this.processImage();
-    }
-
-    toggleBackgroundImage() {
-        this.backgroundImageEnabled = !this.backgroundImageEnabled;
-        this.updateToggleBtn(this.backgroundImageEnabled, 'backgroundImageBtn', 'SHOW IMAGE', 'opacityCard');
-        if (this.originalImage) this.processImage();
-    }
-
-    toggleBackgroundColor() {
-        this.backgroundColorEnabled = !this.backgroundColorEnabled;
-        this.updateToggleBtn(this.backgroundColorEnabled, 'backgroundColorBtn', 'COLOR', 'colorCard');
+    toggleRemoveSide() {
+        this.removeFront = !this.removeFront;
+        document.getElementById('backgroundRemovalBtn').textContent = this.removeFront ? 'REMOVE FRONT' : 'REMOVE BACK';
         if (this.originalImage) this.processImage();
     }
 
@@ -2357,7 +2060,7 @@ class Strata {
         this.backgroundColor = hex;
         document.getElementById('hexColorInput').value = hex;
         document.getElementById('colorPreview').style.backgroundColor = hex;
-        if (this.backgroundColorEnabled && this.originalImage) this.processImage();
+        if (this.originalImage) this.processImage();
     }
 
     toggleColorWheel() {
@@ -2692,12 +2395,6 @@ class Strata {
         return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
     }
 
-    toggleReverseMask() {
-        this.reverseMaskEnabled = !this.reverseMaskEnabled;
-        this.updateToggleBtn(this.reverseMaskEnabled, 'reverseMaskBtn', 'MASK');
-        if (this.originalImage) this.processImage();
-    }
-
     toggleImageMask() {
         this.imageMaskEnabled = !this.imageMaskEnabled;
         this.updateToggleBtn(this.imageMaskEnabled, 'imageMaskBtn', 'IMG MASK');
@@ -2781,45 +2478,260 @@ class Strata {
         }, 200); // Increased to 200ms delay for better performance
     }
 
-    // Helper function to calculate color difference
-    colorDistance(r1, g1, b1, r2, g2, b2) {
-        return Math.sqrt((r1-r2)**2 + (g1-g2)**2 + (b1-b2)**2);
-    }
+    // Foreground mask at reduced resolution: learn background colours from the top/left/right
+    // border, flood-fill the connected background from the edges, drop tiny foreground specks.
+    buildForegroundMask() {
+        const { width, height } = this.canvas;
+        const scale = Math.min(1, 256 / Math.max(width, height));
+        const w = Math.max(1, Math.round(width * scale));
+        const h = Math.max(1, Math.round(height * scale));
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const cx = c.getContext('2d', { willReadFrequently: true });
+        cx.drawImage(this.canvas, 0, 0, w, h);
+        const px = cx.getImageData(0, 0, w, h).data;
+        const n = w * h;
 
-    // Helper function to determine if a color should be considered background
-    isBackgroundColor(r, g, b, sensitivity, dominantColors, barX = 0, barY = 0) {
-        // Find closest dominant (background) colour
-        let minDist = Infinity;
-        for (const domColor of dominantColors) {
-            const d = this.colorDistance(r, g, b, domColor.r, domColor.g, domColor.b);
-            if (d < minDist) minDist = d;
+        const lab = new Float32Array(n * 3);
+        const lin = v => (v /= 255) <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+        const f = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+        for (let i = 0; i < n; i++) {
+            const r = lin(px[i * 4]), g = lin(px[i * 4 + 1]), b = lin(px[i * 4 + 2]);
+            const fx = f((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047);
+            const fy = f(0.2126 * r + 0.7152 * g + 0.0722 * b);
+            const fz = f((0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883);
+            lab[i * 3] = 116 * fy - 16;
+            lab[i * 3 + 1] = 500 * (fx - fy);
+            lab[i * 3 + 2] = 200 * (fy - fz);
         }
 
-        // Hard cap: colours too far from the detected background are never candidates
-        const maxDist = 200;
-        if (minDist >= maxDist) return false;
+        // Bottom edge is left out of the model: subjects (busts, products) usually touch it.
+        const ring = Math.max(1, Math.round(Math.min(w, h) * 0.03));
+        const samples = [];
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                if (y < ring || x < ring || x >= w - ring) samples.push(y * w + x);
+            }
+        }
 
-        // How background-like is this bar? 1 = exact match, 0 = at the edge of maxDist
-        const similarity = 1 - minDist / maxDist;
+        const k = Math.min(8, samples.length);
+        let centers = [];
+        for (let j = 0; j < k; j++) {
+            const i = samples[Math.floor((j + 0.5) * samples.length / k)];
+            centers.push([lab[i * 3], lab[i * 3 + 1], lab[i * 3 + 2]]);
+        }
+        let counts = new Array(k).fill(0);
+        for (let iter = 0; iter < 8; iter++) {
+            const sums = centers.map(() => [0, 0, 0]);
+            counts = new Array(k).fill(0);
+            for (const i of samples) {
+                let best = 0, bestD = Infinity;
+                for (let j = 0; j < k; j++) {
+                    const d = (lab[i * 3] - centers[j][0]) ** 2 + (lab[i * 3 + 1] - centers[j][1]) ** 2 + (lab[i * 3 + 2] - centers[j][2]) ** 2;
+                    if (d < bestD) { bestD = d; best = j; }
+                }
+                sums[best][0] += lab[i * 3]; sums[best][1] += lab[i * 3 + 1]; sums[best][2] += lab[i * 3 + 2];
+                counts[best]++;
+            }
+            centers = centers.map((cen, j) => counts[j] ? sums[j].map(v => v / counts[j]) : cen);
+        }
+        const bgColors = centers.filter((_, j) => counts[j] >= samples.length * 0.03);
 
-        // Stable per-bar deterministic value — same bar always removed/kept at the
-        // same sensitivity, no per-frame flicker
-        const hx = ((barX | 0) * 73856093) >>> 0;
-        const hy = ((barY | 0) * 19349663) >>> 0;
-        const barT = ((hx ^ hy) * 2654435761 >>> 0) / 0xFFFFFFFF;
+        const dist = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+            let m = Infinity;
+            for (const cen of bgColors) {
+                const d = (lab[i * 3] - cen[0]) ** 2 + (lab[i * 3 + 1] - cen[1]) ** 2 + (lab[i * 3 + 2] - cen[2]) ** 2;
+                if (d < m) m = d;
+            }
+            dist[i] = Math.sqrt(m);
+        }
 
-        // sensitivity controls what fraction of background bars are removed:
-        //   sensitivity=100 → all background bars removed
-        //   sensitivity=50  → ~50% of exact-match bars removed (fewer for near-matches)
-        //   sensitivity=0   → nothing removed
-        return (sensitivity / 100) * similarity > barT;
+        // Edge strength: the background fill may not cross object outlines
+        const grad = new Float32Array(n);
+        for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+                const i = y * w + x;
+                let g = 0;
+                for (let ch = 0; ch < 3; ch++) {
+                    const gx = lab[(i + 1) * 3 + ch] - lab[(i - 1) * 3 + ch];
+                    const gy = lab[(i + w) * 3 + ch] - lab[(i - w) * 3 + ch];
+                    g += gx * gx + gy * gy;
+                }
+                grad[i] = Math.sqrt(g);
+            }
+        }
+        const sortedGrad = Float32Array.from(grad).sort();
+        const edgeThreshold = Math.max(10, sortedGrad[Math.floor(n * 0.9)]);
+
+        // Image-adaptive colour tolerance (Otsu on the distance-to-background histogram);
+        // the slider only shifts it: 50 = automatic, higher removes more.
+        const bins = 128, maxD = 100;
+        const hist = new Float64Array(bins);
+        for (let i = 0; i < n; i++) hist[Math.min(bins - 1, Math.floor(dist[i] / maxD * bins))]++;
+        let sumAll = 0;
+        for (let b = 0; b < bins; b++) sumAll += b * hist[b];
+        let wB = 0, sumB = 0, bestVar = -1, bestBin = 0;
+        for (let b = 0; b < bins; b++) {
+            wB += hist[b];
+            if (!wB || wB === n) continue;
+            sumB += b * hist[b];
+            const mB = sumB / wB, mF = (sumAll - sumB) / (n - wB);
+            const between = wB * (n - wB) * (mB - mF) ** 2;
+            if (between > bestVar) { bestVar = between; bestBin = b; }
+        }
+        const autoTol = Math.min(50, Math.max(5, (bestBin + 1) / bins * maxD));
+        const sensitivity = parseInt(document.getElementById('sensitivitySlider').value);
+        let tol = autoTol * Math.pow(2, (sensitivity - 50) / 50);
+
+        const fillBackground = (tolerance) => {
+            const bgMask = new Uint8Array(n);
+            const stack = [];
+            for (let x = 0; x < w; x++) { stack.push(x, (h - 1) * w + x); }
+            for (let y = 0; y < h; y++) { stack.push(y * w, y * w + w - 1); }
+            while (stack.length) {
+                const i = stack.pop();
+                if (bgMask[i] || dist[i] >= tolerance) continue;
+                if (grad[i] >= edgeThreshold && dist[i] >= tolerance * 0.35) continue;
+                bgMask[i] = 1;
+                const x = i % w, y = (i - x) / w;
+                if (x > 0) stack.push(i - 1);
+                if (x < w - 1) stack.push(i + 1);
+                if (y > 0) stack.push(i - w);
+                if (y < h - 1) stack.push(i + w);
+            }
+            return bgMask;
+        };
+
+        // Morphological opening on the foreground: cuts thin bridges to neighbouring background clutter
+        const morph = (src, r, erode) => {
+            const tmp = new Uint8Array(n), out = new Uint8Array(n);
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    let v = erode ? 1 : 0;
+                    for (let d = -r; d <= r; d++) {
+                        const xx = Math.min(w - 1, Math.max(0, x + d));
+                        v = erode ? Math.min(v, src[y * w + xx]) : Math.max(v, src[y * w + xx]);
+                    }
+                    tmp[y * w + x] = v;
+                }
+            }
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    let v = erode ? 1 : 0;
+                    for (let d = -r; d <= r; d++) {
+                        const yy = Math.min(h - 1, Math.max(0, y + d));
+                        v = erode ? Math.min(v, tmp[yy * w + x]) : Math.max(v, tmp[yy * w + x]);
+                    }
+                    out[y * w + x] = v;
+                }
+            }
+            return out;
+        };
+        const segment = (tolerance) => {
+            const r = Math.max(1, Math.round(Math.min(w, h) / 100));
+            let fgMask = new Uint8Array(n);
+            const filled = fillBackground(tolerance);
+            for (let i = 0; i < n; i++) fgMask[i] = filled[i] ? 0 : 1;
+            fgMask = morph(morph(fgMask, r, true), r, false);
+
+            // Keep only the main subject parts: drop components much smaller than the largest one
+            const comps = [];
+            const seen = new Uint8Array(n);
+            for (let s0 = 0; s0 < n; s0++) {
+                if (!fgMask[s0] || seen[s0]) continue;
+                const comp = [s0];
+                seen[s0] = 1;
+                for (let q = 0; q < comp.length; q++) {
+                    const i = comp[q], x = i % w, y = (i - x) / w;
+                    const nb = [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1];
+                    for (const j of nb) {
+                        if (j >= 0 && fgMask[j] && !seen[j]) { seen[j] = 1; comp.push(j); }
+                    }
+                }
+                comps.push(comp);
+            }
+            const largest = comps.reduce((m, c) => Math.max(m, c.length), 0);
+            const minArea = Math.max(n * 0.004, largest * 0.15);
+            const bgMask = new Uint8Array(n).fill(1);
+            let kept = 0;
+            for (const comp of comps) {
+                if (comp.length < minArea) continue;
+                for (const i of comp) bgMask[i] = 0;
+                kept += comp.length;
+            }
+            return { bgMask, fgFrac: kept / n };
+        };
+
+        // Nudge the tolerance when the result is implausible (almost no subject / almost no background)
+        let { bgMask: bg, fgFrac } = segment(tol);
+        for (let attempt = 0; attempt < 4 && (fgFrac < 0.04 || fgFrac > 0.92); attempt++) {
+            tol *= fgFrac < 0.04 ? 0.6 : 1.6;
+            ({ bgMask: bg, fgFrac } = segment(tol));
+        }
+
+        // Summed-area table of foreground pixels for fast per-bar coverage
+        const sat = new Float64Array((w + 1) * (h + 1));
+        for (let y = 0; y < h; y++) {
+            let row = 0;
+            for (let x = 0; x < w; x++) {
+                row += bg[y * w + x] ? 0 : 1;
+                sat[(y + 1) * (w + 1) + x + 1] = sat[y * (w + 1) + x + 1] + row;
+            }
+        }
+        return { sat, w, h, scale };
+    }
+
+    // True when a bar should carry a stroke: foreground bars in REMOVE BACK, background bars in REMOVE FRONT
+    barIsTarget(fg, x, y, bw, bh) {
+        const { sat, w, h, scale } = fg;
+        const x0 = Math.min(w - 1, Math.floor(x * scale)), y0 = Math.min(h - 1, Math.floor(y * scale));
+        const x1 = Math.max(x0 + 1, Math.min(w, Math.round((x + bw) * scale)));
+        const y1 = Math.max(y0 + 1, Math.min(h, Math.round((y + bh) * scale)));
+        const W = w + 1;
+        const fgCount = sat[y1 * W + x1] - sat[y0 * W + x1] - sat[y1 * W + x0] + sat[y0 * W + x0];
+        const isForeground = fgCount / ((x1 - x0) * (y1 - y0)) >= 0.5;
+        return this.removeFront ? !isForeground : isForeground;
+    }
+
+    // Bars that carry a stroke: on the chosen side (front/back), minus the darkest share set by THRESHOLD.
+    // The share is relative to this image's own brightness spread, so every photo breaks up similarly.
+    selectStrokeBars(cols, rows, threshold) {
+        const { width, height } = this.canvas;
+        const data = this.ctx.getImageData(0, 0, width, height).data;
+        const fg = this.buildForegroundMask();
+        const candidates = [];
+        for (let col = 0; col < cols; col++) {
+            const x = Math.round(col * width / cols);
+            const bw = Math.round((col + 1) * width / cols) - x;
+            for (let row = 0; row < rows; row++) {
+                const y = Math.round(row * height / rows);
+                const bh = Math.round((row + 1) * height / rows) - y;
+                if (!this.barIsTarget(fg, x, y, bw, bh)) continue;
+                const sx = Math.min(x + Math.floor(bw / 2), width - 1);
+                const sy = Math.min(y + Math.floor(bh / 2), height - 1);
+                const i = (sy * width + sx) * 4;
+                const r = data[i], g = data[i + 1], b = data[i + 2];
+                candidates.push({ x, y, width: bw, height: bh, r, g, b, lum: 0.299 * r + 0.587 * g + 0.114 * b });
+            }
+        }
+        const removeCount = Math.floor(candidates.length * Math.min(0.9, threshold / 100));
+        // Score = half brightness rank, half stable per-bar noise → removal follows the image but stays scattered
+        const byLum = candidates.map((_, i) => i).sort((a, b) => candidates[a].lum - candidates[b].lum);
+        const score = new Float32Array(candidates.length);
+        byLum.forEach((ci, rank) => {
+            const c = candidates[ci];
+            const noise = (Math.imul(Math.imul(c.x, 73856093) ^ Math.imul(c.y, 19349663), 2654435761) >>> 0) / 0xFFFFFFFF;
+            score[ci] = 0.5 * rank / candidates.length + 0.5 * noise;
+        });
+        const lowest = candidates.map((_, i) => i).sort((a, b) => score[a] - score[b]);
+        const removed = new Set(lowest.slice(0, removeCount));
+        return candidates.filter((_, i) => !removed.has(i));
     }
 
     pixelateImage(pixelSize, threshold, stretchFactor) {
         const { width, height } = this.canvas;
-        const imageData = this.ctx.getImageData(0, 0, width, height);
-        const data = imageData.data;
-        
+
         this.clearCanvasBackground();
         
         // NEW APPROACH: Create vertical bars by sampling horizontally and drawing tall rectangles
@@ -2832,80 +2744,11 @@ class Strata {
         const numBarsHorizontally = Math.max(1, Math.round(width / barWidth));
         const numBarsVertically = Math.max(1, Math.round(height / desiredBarHeight));
 
-        // Get background removal settings
-        const sensitivity = this.isColorMode && this.backgroundRemovalEnabled ?
-            parseInt(document.getElementById('sensitivitySlider').value) : 0;
-
-        // If background removal is enabled, detect dominant colors (simplified approach)
-        let dominantColors = [];
-        if (this.isColorMode && this.backgroundRemovalEnabled) {
-            // Sample corner pixels to detect likely background colors
-            const corners = [
-                {x: 0, y: 0}, {x: width-1, y: 0},
-                {x: 0, y: height-1}, {x: width-1, y: height-1}
-            ];
-
-            for (let corner of corners) {
-                const index = (corner.y * width + corner.x) * 4;
-                dominantColors.push({
-                    r: data[index],
-                    g: data[index + 1],
-                    b: data[index + 2]
-                });
-            }
+        this.pixelCtx.fillStyle = this.backgroundColor;
+        for (const bar of this.selectStrokeBars(numBarsHorizontally, numBarsVertically, threshold)) {
+            this.pixelCtx.fillRect(bar.x, bar.y, bar.width, bar.height);
         }
 
-        // Draw vertical bars across the image using proportional grid — no partial/bleeding bars
-        for (let col = 0; col < numBarsHorizontally; col++) {
-            const x = Math.round(col * width / numBarsHorizontally);
-            const actualBarWidth = Math.round((col + 1) * width / numBarsHorizontally) - x;
-            for (let row = 0; row < numBarsVertically; row++) {
-                const y = Math.round(row * height / numBarsVertically);
-                const actualBarHeight = Math.round((row + 1) * height / numBarsVertically) - y;
-                // Sample a point in this area
-                const sampleX = Math.min(x + Math.floor(actualBarWidth / 2), width - 1);
-                const sampleY = Math.min(y + Math.floor(actualBarHeight / 2), height - 1);
-                const index = (sampleY * width + sampleX) * 4;
-
-                let r = data[index] || 0;
-                let g = data[index + 1] || 0;
-                let b = data[index + 2] || 0;
-
-                // Apply color mode and threshold
-                if (!this.isColorMode) {
-                    const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-                    r = g = b = gray > threshold * 2.55 ? 255 : 0;
-                } else {
-                    // In colored mode, check for background removal
-                    if (this.backgroundRemovalEnabled && this.isBackgroundColor(r, g, b, sensitivity, dominantColors, x, y)) {
-                        continue; // Skip background colors
-                    }
-
-                    r = r > threshold * 2.55 ? r : 0;
-                    g = g > threshold * 2.55 ? g : 0;
-                    b = b > threshold * 2.55 ? b : 0;
-                }
-
-                // Skip black/transparent pixels
-                if (r === 0 && g === 0 && b === 0) continue;
-
-                // Draw the vertical bar
-                if (this.reverseMaskEnabled && this.originalImage) {
-                    // Reverse mask mode: draw original image portion instead of colored bar
-                    this.pixelCtx.save();
-                    this.pixelCtx.beginPath();
-                    this.pixelCtx.rect(x, y, actualBarWidth, actualBarHeight);
-                    this.pixelCtx.clip();
-                    this.drawOriginalImageToContext(this.pixelCtx);
-                    this.pixelCtx.restore();
-                } else {
-                    // Normal mode: draw colored bar
-                    this.pixelCtx.fillStyle = `rgb(${r},${g},${b})`;
-                    this.pixelCtx.fillRect(x, y, actualBarWidth, actualBarHeight);
-                }
-            }
-        }
-        
         this.pixelCanvas.style.display = 'block';
         this.canvas.style.display = 'block';
     }
@@ -2928,20 +2771,6 @@ class Strata {
 
         // Clear the temporary canvas
         tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
-
-        // Fill background with custom color if enabled
-        if (this.backgroundColorEnabled) {
-            tempCtx.fillStyle = this.backgroundColor;
-            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-        }
-
-        // Draw background image if enabled
-        if (this.backgroundImageEnabled && this.originalImage) {
-            const opacity = parseInt(document.getElementById('opacitySlider').value) / 100;
-            tempCtx.globalAlpha = opacity;
-            tempCtx.drawImage(this.originalImage, 0, 0, finalWidth, finalHeight);
-            tempCtx.globalAlpha = 1.0; // Reset opacity
-        }
 
         // Draw the pixelated bars on top (using original size)
         tempCtx.drawImage(this.pixelCanvas, 0, 0);
