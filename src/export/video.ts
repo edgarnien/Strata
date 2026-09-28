@@ -31,6 +31,7 @@ export function exportVideo(scene: Scene, onProgress: (value: number) => void): 
   };
 
   worker.addEventListener('message', (e: MessageEvent<FromWorker>) => {
+    if (settled) return; // late messages after cancel/terminate must not revive the dialog
     const m = e.data;
     if (m.type === 'progress') onProgress(m.value);
     else if (m.type === 'done') {
