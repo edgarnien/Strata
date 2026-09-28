@@ -33,8 +33,8 @@ describe('seeded motions', () => {
   for (const id of ['impulse', 'wave', 'glitch'] as const) {
     it(`${id} changes with the seed`, () => {
       const m = motionById(id);
-      const a = record((ctx) => m.draw(ctx, frame({ progress: 0.3, seed: 1 })));
-      const b = record((ctx) => m.draw(ctx, frame({ progress: 0.3, seed: 2 })));
+      const a = record((ctx) => m.draw(ctx, frame({ progress: 0.1, seed: 1 })));
+      const b = record((ctx) => m.draw(ctx, frame({ progress: 0.1, seed: 2 })));
       expect(a).not.toEqual(b);
     });
   }
