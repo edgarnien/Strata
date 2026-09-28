@@ -1,0 +1,114 @@
+<style>
+  .phones { display:flex; gap:28px; flex-wrap:wrap; justify-content:center; margin-top:16px; }
+  .ph-wrap { display:flex; flex-direction:column; align-items:center; gap:10px; cursor:pointer; }
+  .ph-wrap.selected .ph { outline:3px solid #4f8cff; outline-offset:4px; }
+  .ph { width:260px; height:560px; background:#141414; border-radius:30px; border:6px solid #000; overflow:hidden; display:flex; flex-direction:column; font-family:Arial, sans-serif; color:#fff; font-size:10px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  .ph * { box-sizing:border-box; }
+  .top { height:40px; display:flex; align-items:center; justify-content:space-between; padding:0 12px; }
+  .logo { font-weight:bold; letter-spacing:.08em; font-size:11px; }
+  .exp { background:#fff; color:#000; border-radius:14px; padding:5px 11px; font-weight:bold; font-size:9px; letter-spacing:.05em; }
+  .pv { flex:1; display:flex; align-items:center; justify-content:center; background:#0c0c0c; min-height:0; }
+  .frame { height:92%; aspect-ratio:9/16; background:#fff; position:relative; overflow:hidden; }
+  .bars { position:absolute; inset:18% 12%; background:
+      repeating-linear-gradient(90deg,#111 0 7px,transparent 7px 11px);
+      -webkit-mask: radial-gradient(ellipse 60% 55% at 50% 50%, #000 60%, transparent 62%);
+              mask: radial-gradient(ellipse 60% 55% at 50% 50%, #000 60%, transparent 62%); }
+  .transport { height:30px; display:flex; align-items:center; gap:8px; padding:0 12px; color:#bbb; border-top:1px solid #222; }
+  .play { width:20px; height:20px; border-radius:50%; background:#fff; color:#000; display:flex; align-items:center; justify-content:center; font-size:8px; }
+  .thumbs { height:44px; display:flex; gap:5px; padding:6px 12px; align-items:center; border-top:1px solid #222; }
+  .th { width:30px; height:30px; border-radius:5px; background:linear-gradient(135deg,#666,#aaa); flex:none; }
+  .th.on { outline:2px solid #fff; }
+  .th.add { background:#222; border:1px dashed #666; display:flex; align-items:center; justify-content:center; color:#aaa; font-size:14px; }
+  .panel { padding:8px 12px 10px; border-top:1px solid #222; }
+  .plabel { display:flex; justify-content:space-between; color:#999; font-size:8px; font-weight:bold; letter-spacing:.08em; margin-bottom:6px; }
+  .track { height:4px; background:#333; border-radius:2px; position:relative; }
+  .track i { position:absolute; left:0; top:0; bottom:0; width:70%; background:#fff; border-radius:2px; }
+  .track b { position:absolute; left:70%; top:50%; width:14px; height:14px; margin:-7px 0 0 -7px; border-radius:50%; background:#fff; }
+  .tools { height:62px; display:flex; gap:4px; padding:6px 8px; overflow:hidden; border-top:1px solid #222; background:#1b1b1b; position:relative; }
+  .tools::after { content:""; position:absolute; right:0; top:0; bottom:0; width:30px; background:linear-gradient(90deg,transparent,#1b1b1b); }
+  .tool { flex:none; width:46px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:#999; font-size:7.5px; text-transform:uppercase; letter-spacing:.04em; border-radius:8px; }
+  .tool .ic { width:22px; height:22px; border:1.5px solid currentColor; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:10px; }
+  .tool.on { color:#fff; background:#2c2c2c; }
+  .strip { display:flex; gap:8px; padding:8px 12px; overflow:hidden; border-top:1px solid #222; position:relative; }
+  .card { flex:none; width:150px; background:#1f1f1f; border:1px solid #333; border-radius:10px; padding:9px 10px 12px; }
+  .tabs { display:flex; gap:10px; padding:8px 12px 0; color:#777; font-size:8px; font-weight:bold; letter-spacing:.06em; white-space:nowrap; overflow:hidden; }
+  .tabs .on { color:#fff; border-bottom:2px solid #fff; padding-bottom:3px; }
+  .chips { display:flex; gap:5px; }
+  .chip { border:1px solid #444; border-radius:10px; padding:3px 7px; font-size:8px; color:#bbb; white-space:nowrap; }
+  .chip.on { background:#fff; color:#000; border-color:#fff; }
+  .back { flex:none; width:30px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px; border-right:1px solid #333; margin-right:4px; }
+  .cap { max-width:260px; text-align:left; }
+  .cap h3 { margin:0 0 4px; }
+  .cap p { margin:0; font-size:13px; line-height:1.45; }
+  .note { max-width:860px; margin:26px auto 0; font-size:13px; line-height:1.5; }
+</style>
+
+<h2>Mobile-Layout: welches Bedienprinzip?</h2>
+<p class="subtitle">Allen gemeinsam: Die Vorschau bleibt immer sichtbar, EXPORT sitzt oben rechts, und die Bilder liegen als Clip-Leiste unter der Vorschau (statt der Galerie oben rechts). Klick auf ein Handy, um es auszuwählen.</p>
+
+<div class="phones">
+
+  <!-- A -->
+  <div class="ph-wrap" data-choice="a" onclick="toggleSelect(this)">
+    <div class="ph">
+      <div class="top"><span class="logo">STRATA</span><span class="exp">EXPORT</span></div>
+      <div class="pv"><div class="frame"><div class="bars"></div></div></div>
+      <div class="transport"><span class="play">▶</span><span>↑ BUILD UP</span><span style="margin-left:auto">3× · 18,0 s</span></div>
+      <div class="thumbs"><span class="th on"></span><span class="th"></span><span class="th add">+</span></div>
+      <div class="panel">
+        <div class="plabel"><span>SIZE</span><span style="color:#fff">80</span></div>
+        <div class="track"><i></i><b></b></div>
+      </div>
+      <div class="tools">
+        <div class="tool on"><span class="ic">▣</span>Size</div>
+        <div class="tool"><span class="ic">↔</span>Stretch</div>
+        <div class="tool"><span class="ic">◐</span>Thresh.</div>
+        <div class="tool"><span class="ic">✂</span>Remove</div>
+        <div class="tool"><span class="ic">●</span>Color</div>
+        <div class="tool"><span class="ic">∿</span>Motion</div>
+      </div>
+    </div>
+    <div class="cap"><h3>A · Werkzeugleiste</h3><p>Wie CapCut: unten eine horizontal scrollbare Icon-Leiste mit allen Werkzeugen. Tippst du ein Werkzeug an, erscheint <b>nur dessen</b> Regler darüber. Das ist sehr aufgeräumt, und die Vorschau bleibt maximal groß.</p></div>
+  </div>
+
+  <!-- B -->
+  <div class="ph-wrap" data-choice="b" onclick="toggleSelect(this)">
+    <div class="ph">
+      <div class="top"><span class="logo">STRATA</span><span class="exp">EXPORT</span></div>
+      <div class="pv"><div class="frame"><div class="bars"></div></div></div>
+      <div class="transport"><span class="play">▶</span><span>↑ BUILD UP</span><span style="margin-left:auto">3× · 18,0 s</span></div>
+      <div class="thumbs"><span class="th on"></span><span class="th"></span><span class="th add">+</span></div>
+      <div class="tabs"><span class="on">IMAGE</span><span>BACKGROUND</span><span>COLOR</span><span>MOTION</span><span>FORMAT</span></div>
+      <div class="strip">
+        <div class="card"><div class="plabel"><span>SIZE</span><span style="color:#fff">80</span></div><div class="track"><i></i><b></b></div></div>
+        <div class="card"><div class="plabel"><span>STRETCH</span><span style="color:#fff">0</span></div><div class="track"><i style="width:5%"></i><b style="left:5%"></b></div></div>
+      </div>
+    </div>
+    <div class="cap"><h3>B · Karten-Strip</h3><p>Alle Regler liegen als Karten nebeneinander auf <b>einer</b> horizontalen Scroll-Ebene, die beim Wischen einrastet. Die Tabs darüber springen zur jeweiligen Gruppe. So siehst du zwei Regler gleichzeitig, der Strip braucht aber etwas mehr Höhe.</p></div>
+  </div>
+
+  <!-- C -->
+  <div class="ph-wrap" data-choice="c" onclick="toggleSelect(this)">
+    <div class="ph">
+      <div class="top"><span class="logo">STRATA</span><span class="exp">EXPORT</span></div>
+      <div class="pv"><div class="frame"><div class="bars"></div></div></div>
+      <div class="transport"><span class="play">▶</span><span>↑ BUILD UP</span><span style="margin-left:auto">3× · 18,0 s</span></div>
+      <div class="thumbs"><span class="th on"></span><span class="th"></span><span class="th add">+</span></div>
+      <div class="panel">
+        <div class="plabel"><span>SPEED</span><span style="color:#fff">2.0×</span></div>
+        <div class="track"><i style="width:20%"></i><b style="left:20%"></b></div>
+      </div>
+      <div class="tools">
+        <div class="back">‹</div>
+        <div class="tool"><span class="ic">↑</span>Type</div>
+        <div class="tool on"><span class="ic">»</span>Speed</div>
+        <div class="tool"><span class="ic">⟳</span>Loops</div>
+        <div class="tool"><span class="ic">▶</span>Play</div>
+      </div>
+    </div>
+    <div class="cap"><h3>C · Zwei Ebenen</h3><p>Unten stehen 5 Kategorien (Image, Background, Color, Motion, Format). Tippst du z.B. auf „Motion“, klappt eine zweite Leiste mit deren Werkzeugen auf (hier gezeigt), mit ‹ geht es zurück. Das entspricht am ehesten CapCut, kostet aber einen Tipp mehr.</p></div>
+  </div>
+
+</div>
+
+<p class="note subtitle">Die Labels sind hier auf Englisch wie im jetzigen Tool. Der Desktop behält die Sidebar links, bekommt aber denselben Look.</p>

@@ -1,0 +1,136 @@
+<style>
+  .row { display:flex; gap:28px; flex-wrap:wrap; justify-content:center; align-items:flex-start; margin-top:14px; }
+  .col { display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .cap { max-width:270px; font-size:13px; line-height:1.45; }
+  .cap h3 { margin:0 0 4px; }
+  .ph { width:260px; height:560px; background:#141414; border-radius:30px; border:6px solid #000; overflow:hidden; display:flex; flex-direction:column; font-family:Arial, sans-serif; color:#fff; font-size:10px; position:relative; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  .ph *, .dk * { box-sizing:border-box; }
+  .top { height:40px; flex:none; display:flex; align-items:center; justify-content:space-between; padding:0 12px; }
+  .logo { font-weight:bold; letter-spacing:.08em; font-size:11px; }
+  .exp { background:#fff; color:#000; border-radius:14px; padding:5px 11px; font-weight:bold; font-size:9px; letter-spacing:.05em; }
+  .exp.off { background:#333; color:#666; }
+  .pv { flex:1; display:flex; align-items:center; justify-content:center; background:#0c0c0c; min-height:0; }
+  .frame { height:92%; aspect-ratio:9/16; background:#fff; position:relative; overflow:hidden; }
+  .bars { position:absolute; inset:18% 12%; background:repeating-linear-gradient(90deg,#111 0 7px,transparent 7px 11px);
+    -webkit-mask: radial-gradient(ellipse 60% 55% at 50% 50%, #000 60%, transparent 62%); mask: radial-gradient(ellipse 60% 55% at 50% 50%, #000 60%, transparent 62%); }
+  .transport { height:30px; flex:none; display:flex; align-items:center; gap:8px; padding:0 12px; color:#bbb; border-top:1px solid #222; }
+  .play { width:20px; height:20px; border-radius:50%; background:#fff; color:#000; display:flex; align-items:center; justify-content:center; font-size:8px; }
+  .thumbs { height:44px; flex:none; display:flex; gap:5px; padding:6px 12px; align-items:center; border-top:1px solid #222; }
+  .th { width:30px; height:30px; border-radius:5px; background:linear-gradient(135deg,#666,#aaa); flex:none; position:relative; }
+  .th.on { outline:2px solid #fff; }
+  .th.on::after { content:"×"; position:absolute; top:-6px; right:-6px; width:13px; height:13px; border-radius:50%; background:#fff; color:#000; font-size:10px; line-height:13px; text-align:center; }
+  .th.add { background:#222; border:1px dashed #666; display:flex; align-items:center; justify-content:center; color:#aaa; font-size:14px; }
+  .panel { flex:none; padding:8px 12px 10px; border-top:1px solid #222; }
+  .lbl { color:#999; font-size:8px; font-weight:bold; letter-spacing:.08em; margin-bottom:5px; }
+  .dd { display:flex; align-items:center; gap:8px; border:1.5px solid #fff; border-radius:8px; padding:8px 10px; font-weight:bold; font-size:10px; letter-spacing:.04em; }
+  .dd .px { color:#999; font-weight:normal; }
+  .dd .car { margin-left:auto; font-size:8px; }
+  .menu { position:absolute; left:12px; right:12px; bottom:128px; background:#232323; border:1px solid #444; border-radius:10px; padding:4px; box-shadow:0 -8px 24px rgba(0,0,0,.6); }
+  .mi { display:flex; align-items:center; gap:8px; padding:8px; border-radius:6px; font-size:10px; font-weight:bold; letter-spacing:.04em; }
+  .mi .ic { width:14px; text-align:center; color:#ccc; }
+  .mi .px { color:#888; font-weight:normal; margin-left:auto; }
+  .mi.sel { background:#fff; color:#000; }
+  .mi.sel .ic, .mi.sel .px { color:#555; }
+  .mi .ck { width:10px; font-size:9px; }
+  .tools { height:62px; flex:none; display:flex; gap:4px; padding:6px 8px; overflow:hidden; border-top:1px solid #222; background:#1b1b1b; position:relative; }
+  .tools::after { content:""; position:absolute; right:0; top:0; bottom:0; width:30px; background:linear-gradient(90deg,transparent,#1b1b1b); }
+  .tool { flex:none; width:46px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:#999; font-size:7.5px; text-transform:uppercase; letter-spacing:.04em; border-radius:8px; }
+  .tool .ic { width:22px; height:22px; border:1.5px solid currentColor; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:10px; }
+  .tool.on { color:#fff; background:#2c2c2c; }
+  .tools.off .tool { color:#444; }
+  .empty { display:flex; flex-direction:column; align-items:center; gap:10px; color:#777; }
+  .upl { border:1.5px solid #fff; color:#fff; border-radius:20px; padding:9px 16px; font-weight:bold; font-size:10px; letter-spacing:.06em; }
+  /* desktop */
+  .dk { width:600px; height:380px; background:#141414; border:6px solid #000; border-radius:12px; display:flex; font-family:Arial, sans-serif; color:#fff; font-size:9px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  .side { width:170px; flex:none; background:#1b1b1b; border-right:1px solid #2a2a2a; padding:10px; display:flex; flex-direction:column; gap:9px; overflow:hidden; }
+  .grp { display:flex; flex-direction:column; gap:5px; }
+  .gl { color:#777; font-size:7.5px; font-weight:bold; letter-spacing:.1em; }
+  .sl { display:flex; flex-direction:column; gap:3px; }
+  .sl span { font-size:7.5px; color:#ccc; font-weight:bold; letter-spacing:.06em; }
+  .trk { height:3px; background:#333; border-radius:2px; position:relative; }
+  .trk i { position:absolute; left:0; top:0; bottom:0; background:#fff; border-radius:2px; }
+  .trk b { position:absolute; top:50%; width:9px; height:9px; margin:-4.5px 0 0 -4.5px; border-radius:50%; background:#fff; }
+  .btn { border:1.5px solid #fff; border-radius:6px; padding:5px 7px; font-weight:bold; font-size:8px; letter-spacing:.04em; display:flex; justify-content:space-between; }
+  .btn.fill { background:#fff; color:#000; justify-content:center; }
+  .main { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .main .pv { background:#0c0c0c; }
+  .main .frame { height:90%; }
+  .main .transport, .main .thumbs { border-top:1px solid #222; }
+</style>
+
+<h2>UI: Mobile & Desktop</h2>
+<p class="subtitle">Farben und Stil bleiben wie bisher (dunkel, weiß, Großbuchstaben) und werden nur aufgeräumt. Gebaut werden beide Ansichten aus derselben Werkzeug-Liste.</p>
+
+<div class="row">
+
+  <div class="col">
+    <div class="ph">
+      <div class="top"><span class="logo">STRATA</span><span class="exp">EXPORT</span></div>
+      <div class="pv"><div class="frame"><div class="bars"></div></div></div>
+      <div class="transport"><span class="play">▶</span><span>↑ BUILD UP</span><span style="margin-left:auto">3× · 18,0 s</span></div>
+      <div class="thumbs"><span class="th on"></span><span class="th"></span><span class="th add">+</span></div>
+      <div class="menu">
+        <div class="mi sel"><span class="ck">✓</span><span class="ic">▯</span>9:16<span class="px">1080 × 1920</span></div>
+        <div class="mi"><span class="ck"></span><span class="ic">▯</span>4:5<span class="px">1080 × 1350</span></div>
+        <div class="mi"><span class="ck"></span><span class="ic">▭</span>16:9<span class="px">1920 × 1080</span></div>
+        <div class="mi"><span class="ck"></span><span class="ic">□</span>ORIGINAL<span class="px">1500 × 2000</span></div>
+      </div>
+      <div class="panel">
+        <div class="lbl">FORMAT</div>
+        <div class="dd"><span>▯</span>9:16 <span class="px">1080 × 1920</span><span class="car">▲</span></div>
+      </div>
+      <div class="tools">
+        <div class="tool"><span class="ic">∿</span>Motion</div>
+        <div class="tool"><span class="ic">»</span>Speed</div>
+        <div class="tool"><span class="ic">⟳</span>Loops</div>
+        <div class="tool on"><span class="ic">▯</span>Format</div>
+        <div class="tool"><span class="ic">↺</span>Reset</div>
+      </div>
+    </div>
+    <div class="cap"><h3>① Mobil: Format-Werkzeug offen</h3>„FORMAT“ steht als Label <b>über</b> dem Button, der Button zeigt nur die Auswahl. Das Menü klappt nach oben auf: 9:16 (ausgewählt), 4:5, 16:9, Original, jeweils mit Symbol davor und Pixelmaß dahinter. Bei Original steht die echte Ausgabegröße des aktuellen Bildes.</div>
+  </div>
+
+  <div class="col">
+    <div class="ph">
+      <div class="top"><span class="logo">STRATA</span><span class="exp off">EXPORT</span></div>
+      <div class="pv"><div class="empty"><span class="upl">+ BILD HOCHLADEN</span><span>PNG · JPG · WEBP</span></div></div>
+      <div class="tools off">
+        <div class="tool"><span class="ic">▣</span>Size</div>
+        <div class="tool"><span class="ic">↔</span>Stretch</div>
+        <div class="tool"><span class="ic">◐</span>Thresh.</div>
+        <div class="tool"><span class="ic">✂</span>Remove</div>
+        <div class="tool"><span class="ic">●</span>Color</div>
+      </div>
+    </div>
+    <div class="cap"><h3>② Mobil: leerer Zustand</h3>Ohne Bild gibt es nur den Upload-Button, die Werkzeuge sind ausgegraut. Ab dem ersten Bild wird der Upload-Hinweis <b>gar nicht mehr gerendert</b> (statt nur überdeckt), dadurch kann nichts mehr durchblitzen. Weitere Bilder kommen über „+“ in der Clip-Leiste dazu.</div>
+  </div>
+
+</div>
+
+<div class="row" style="margin-top:30px">
+  <div class="col">
+    <div class="dk">
+      <div class="side">
+        <div class="logo" style="font-size:10px">STRATA</div>
+        <div class="grp"><div class="gl">ADJUST</div>
+          <div class="sl"><span>SIZE</span><div class="trk"><i style="width:70%"></i><b style="left:70%"></b></div></div>
+          <div class="sl"><span>STRETCH</span><div class="trk"><i style="width:5%"></i><b style="left:5%"></b></div></div>
+          <div class="sl"><span>THRESHOLD</span><div class="trk"><i style="width:35%"></i><b style="left:35%"></b></div></div>
+        </div>
+        <div class="grp"><div class="gl">BACKGROUND</div><div class="btn"><span>REMOVE BACK</span><span>⇄</span></div></div>
+        <div class="grp"><div class="gl">COLOR</div><div class="btn"><span>#FFFFFF</span><span style="width:10px;height:10px;background:#fff;border-radius:50%"></span></div></div>
+        <div class="grp"><div class="gl">MOTION</div><div class="btn"><span>↑ BUILD UP</span><span>▾</span></div>
+          <div class="sl"><span>SPEED · 2.0×</span><div class="trk"><i style="width:20%"></i><b style="left:20%"></b></div></div>
+          <div class="sl"><span>LOOPS · 3×</span></div></div>
+        <div class="grp"><div class="gl">FORMAT</div><div class="btn"><span>▯ 9:16 <span style="color:#999;font-weight:normal">1080×1920</span></span><span>▾</span></div></div>
+        <div class="btn fill" style="margin-top:auto">EXPORT</div>
+      </div>
+      <div class="main">
+        <div class="pv"><div class="frame"><div class="bars"></div></div></div>
+        <div class="transport"><span class="play">▶</span><span>↑ BUILD UP</span><span style="margin-left:auto">3× · 18,0 s</span></div>
+        <div class="thumbs"><span class="th on"></span><span class="th"></span><span class="th add">+</span></div>
+      </div>
+    </div>
+    <div class="cap" style="max-width:600px"><h3>③ Desktop</h3>Die Sidebar links bleibt, jetzt in klaren Gruppen: ADJUST, BACKGROUND, COLOR, MOTION, FORMAT und unten EXPORT. Die Galerie oben rechts wird durch dieselbe Clip-Leiste unter der Vorschau ersetzt wie mobil (Tippen = auswählen, Ziehen = umsortieren). Drag & Drop von Dateien auf die Vorschau funktioniert weiter.</div>
+  </div>
+</div>
