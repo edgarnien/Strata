@@ -1,3 +1,4 @@
+import { drawFitted } from '../engine/draw';
 import { images, patchSettings, playing, selected, settings, type ImageEntry } from '../state/store';
 import { moveItem } from '../util/array';
 import { forgetImage } from './scene';
@@ -11,12 +12,48 @@ export function isAcceptedImage(file: { type: string; name: string }): boolean {
   return file.type ? ACCEPTED.includes(file.type) : /\.(png|jpe?g|webp)$/i.test(file.name);
 }
 
+/** ORIGINAL needs ≤ 2000 px on the long edge; cover formats need ≤ 1920 px on the short edge. */
+const KEEP_LONG_EDGE = 2000;
+const KEEP_SHORT_EDGE = 1920;
+const THUMB_SIZE = 96;
+
+/** Scale (≤ 1) that keeps every output format at full quality. */
+export function keepScale(width: number, height: number): number {
+  const long = Math.max(width, height);
+  const short = Math.min(width, height);
+  return Math.min(1, Math.max(KEEP_LONG_EDGE / long, KEEP_SHORT_EDGE / short));
+}
+
 async function decode(file: File): Promise<ImageBitmap> {
   try {
     return await createImageBitmap(file, { imageOrientation: 'from-image' });
   } catch {
     return await createImageBitmap(file); // older engines reject the options bag
   }
+}
+
+async function shrink(bitmap: ImageBitmap): Promise<ImageBitmap> {
+  const scale = keepScale(bitmap.width, bitmap.height);
+  if (scale >= 1) return bitmap;
+  try {
+    const small = await createImageBitmap(bitmap, {
+      resizeWidth: Math.round(bitmap.width * scale),
+      resizeHeight: Math.round(bitmap.height * scale),
+      resizeQuality: 'high',
+    });
+    bitmap.close();
+    return small;
+  } catch {
+    return bitmap; // engines without resize options keep the full-size decode
+  }
+}
+
+async function thumbnail(bitmap: ImageBitmap): Promise<string> {
+  const canvas = new OffscreenCanvas(THUMB_SIZE, THUMB_SIZE);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2D canvas is not available.');
+  drawFitted(ctx, bitmap, THUMB_SIZE, THUMB_SIZE, 'cover');
+  return URL.createObjectURL(await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.8 }));
 }
 
 export async function addImageFiles(files: Iterable<File>): Promise<void> {
@@ -27,8 +64,8 @@ export async function addImageFiles(files: Iterable<File>): Promise<void> {
       continue;
     }
     try {
-      const bitmap = await decode(file);
-      added.push({ id: `img${++nextId}`, name: file.name, bitmap, thumbUrl: URL.createObjectURL(file) });
+      const bitmap = await shrink(await decode(file));
+      added.push({ id: `img${++nextId}`, name: file.name, bitmap, thumbUrl: await thumbnail(bitmap) });
     } catch {
       toast(`${file.name} could not be loaded`, 'error');
     }

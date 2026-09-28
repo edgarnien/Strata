@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { images, patchSettings, playing, selected, settings, type ImageEntry } from '../../src/state/store';
-import { isAcceptedImage, moveImage, removeImage } from '../../src/ui/images';
+import { isAcceptedImage, keepScale, moveImage, removeImage } from '../../src/ui/images';
 
 const entry = (id: string): ImageEntry => ({
   id,
@@ -49,6 +49,21 @@ describe('moveImage', () => {
     moveImage(0, 2);
     expect(ids()).toEqual(['b', 'c', 'a']);
     expect(selected.get()).toBe(2);
+  });
+});
+
+describe('keepScale', () => {
+  it('shrinks a 4:3 photo to the short-edge cap', () => {
+    expect(keepScale(4032, 3024)).toBeCloseTo(1920 / 3024);
+  });
+  it('shrinks a wide photo, picking whichever cap needs the larger scale', () => {
+    expect(keepScale(6000, 4000)).toBeCloseTo(0.48);
+  });
+  it('never upscales a small image', () => {
+    expect(keepScale(1080, 1920)).toBe(1);
+  });
+  it('keeps a thin panorama at its short-edge cap', () => {
+    expect(keepScale(8000, 1000)).toBe(1);
   });
 });
 
