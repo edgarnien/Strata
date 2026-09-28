@@ -2,8 +2,10 @@ import './styles/tokens.css';
 import './styles/layout.css';
 import './styles/components.css';
 import { makeTestImage } from './dev/testImage';
+import { exportVideo } from './export/video';
 import { effect } from './state/signal';
-import { images, patchSettings } from './state/store';
+import { exporting, images, patchSettings } from './state/store';
+import { mountExportDialog } from './ui/exportDialog';
 import { addImageFiles } from './ui/images';
 import { mountPreview } from './ui/preview';
 import { buildScene } from './ui/scene';
@@ -24,14 +26,20 @@ fileInput.addEventListener('change', () => {
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', (e) => e.preventDefault());
 
-mountPreview(byId('preview'), pickFiles);
+const preview = mountPreview(byId('preview'), pickFiles);
+const exportDialog = mountExportDialog(byId<HTMLDialogElement>('exportDialog'), preview);
 
-effect([images], () => {
-  document.body.classList.toggle('is-empty', images.get().length === 0);
+const topExport = byId<HTMLButtonElement>('exportBtnTop');
+topExport.addEventListener('click', exportDialog.open);
+
+effect([images, exporting], () => {
+  const empty = images.get().length === 0;
+  document.body.classList.toggle('is-empty', empty);
+  topExport.disabled = empty || exporting.get();
 });
 
 if (import.meta.env.DEV) {
   const loadTestImage = async (accent?: string, width?: number, height?: number) =>
     addImageFiles([await makeTestImage(accent, width, height)]);
-  Object.assign(window, { __strata: { addImageFiles, buildScene, loadTestImage, patchSettings } });
+  Object.assign(window, { __strata: { addImageFiles, buildScene, exportVideo, loadTestImage, patchSettings } });
 }
