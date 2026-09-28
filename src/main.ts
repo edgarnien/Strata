@@ -5,12 +5,14 @@ import { makeTestImage } from './dev/testImage';
 import { exportVideo } from './export/video';
 import { effect } from './state/signal';
 import { exporting, images, patchSettings } from './state/store';
+import { mountClips } from './ui/clips';
 import { mountExportDialog } from './ui/exportDialog';
 import { addImageFiles } from './ui/images';
 import { mountPreview } from './ui/preview';
 import { buildScene } from './ui/scene';
 import { mountSidebar } from './ui/sidebar';
 import { mountToolbar } from './ui/toolbar';
+import { mountTransport } from './ui/transport';
 
 const byId = <T extends HTMLElement = HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -32,17 +34,22 @@ const preview = mountPreview(byId('preview'), pickFiles);
 const exportDialog = mountExportDialog(byId<HTMLDialogElement>('exportDialog'), preview);
 mountSidebar(byId('sidebar'), exportDialog.open);
 mountToolbar(byId('toolbar'), byId('panel'));
+mountTransport(byId('transport'));
+mountClips(byId('clips'), pickFiles);
 
 const topExport = byId<HTMLButtonElement>('exportBtnTop');
 topExport.addEventListener('click', exportDialog.open);
 
-// Tools are greyed out without clips and locked while a video renders.
-const lockable = ['sidebar', 'panel', 'toolbar'].map((id) => byId(id));
+// Tools are greyed out without clips; everything is locked while a video renders.
+const tools = ['sidebar', 'panel', 'toolbar'].map((id) => byId(id));
+const timeline = ['transport', 'clips'].map((id) => byId(id));
 effect([images, exporting], () => {
   const empty = images.get().length === 0;
+  const busy = exporting.get();
   document.body.classList.toggle('is-empty', empty);
-  topExport.disabled = empty || exporting.get();
-  for (const el of lockable) el.inert = empty || exporting.get();
+  topExport.disabled = empty || busy;
+  for (const el of tools) el.inert = empty || busy;
+  for (const el of timeline) el.inert = busy;
 });
 
 if (import.meta.env.DEV) {
