@@ -3,8 +3,13 @@ import { moveItem } from '../util/array';
 import { forgetImage } from './scene';
 import { toast } from './toast';
 
-const ACCEPTED = ['image/png', 'image/jpeg', 'image/webp'];
+const ACCEPTED = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
 let nextId = 0;
+
+/** Some drag sources report no MIME type; fall back to the file extension. */
+export function isAcceptedImage(file: { type: string; name: string }): boolean {
+  return file.type ? ACCEPTED.includes(file.type) : /\.(png|jpe?g|webp)$/i.test(file.name);
+}
 
 async function decode(file: File): Promise<ImageBitmap> {
   try {
@@ -17,7 +22,7 @@ async function decode(file: File): Promise<ImageBitmap> {
 export async function addImageFiles(files: Iterable<File>): Promise<void> {
   const added: ImageEntry[] = [];
   for (const file of files) {
-    if (!ACCEPTED.includes(file.type)) {
+    if (!isAcceptedImage(file)) {
       toast(`${file.name}: please use PNG, JPG or WEBP`, 'error');
       continue;
     }

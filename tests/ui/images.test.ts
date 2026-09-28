@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { images, patchSettings, playing, selected, settings, type ImageEntry } from '../../src/state/store';
-import { moveImage, removeImage } from '../../src/ui/images';
+import { isAcceptedImage, moveImage, removeImage } from '../../src/ui/images';
 
 const entry = (id: string): ImageEntry => ({
   id,
@@ -49,5 +49,20 @@ describe('moveImage', () => {
     moveImage(0, 2);
     expect(ids()).toEqual(['b', 'c', 'a']);
     expect(selected.get()).toBe(2);
+  });
+});
+
+describe('isAcceptedImage', () => {
+  it('accepts image/jpg (some encoders report it instead of image/jpeg)', () => {
+    expect(isAcceptedImage({ type: 'image/jpg', name: 'a.jpg' })).toBe(true);
+  });
+  it('falls back to the file extension when the MIME type is empty', () => {
+    expect(isAcceptedImage({ type: '', name: 'A.PNG' })).toBe(true);
+  });
+  it('rejects an unsupported MIME type', () => {
+    expect(isAcceptedImage({ type: 'image/gif', name: 'a.gif' })).toBe(false);
+  });
+  it('rejects an unsupported extension when the MIME type is empty', () => {
+    expect(isAcceptedImage({ type: '', name: 'notes.txt' })).toBe(false);
   });
 });
