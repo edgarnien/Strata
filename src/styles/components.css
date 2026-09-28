@@ -350,4 +350,5 @@
   .clips { padding: 8px 14px; }
   .dd__caret { rotate: 180deg; }
   .toasts { bottom: calc(160px + env(safe-area-inset-bottom)); }
+  .hex { font-size: 16px; }
 }
