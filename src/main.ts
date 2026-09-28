@@ -9,6 +9,8 @@ import { mountExportDialog } from './ui/exportDialog';
 import { addImageFiles } from './ui/images';
 import { mountPreview } from './ui/preview';
 import { buildScene } from './ui/scene';
+import { mountSidebar } from './ui/sidebar';
+import { mountToolbar } from './ui/toolbar';
 
 const byId = <T extends HTMLElement = HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -28,14 +30,19 @@ window.addEventListener('drop', (e) => e.preventDefault());
 
 const preview = mountPreview(byId('preview'), pickFiles);
 const exportDialog = mountExportDialog(byId<HTMLDialogElement>('exportDialog'), preview);
+mountSidebar(byId('sidebar'), exportDialog.open);
+mountToolbar(byId('toolbar'), byId('panel'));
 
 const topExport = byId<HTMLButtonElement>('exportBtnTop');
 topExport.addEventListener('click', exportDialog.open);
 
+// Tools are greyed out without clips and locked while a video renders.
+const lockable = ['sidebar', 'panel', 'toolbar'].map((id) => byId(id));
 effect([images, exporting], () => {
   const empty = images.get().length === 0;
   document.body.classList.toggle('is-empty', empty);
   topExport.disabled = empty || exporting.get();
+  for (const el of lockable) el.inert = empty || exporting.get();
 });
 
 if (import.meta.env.DEV) {

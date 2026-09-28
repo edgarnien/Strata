@@ -116,7 +116,8 @@
 .dd__button { width: 100%; justify-content: flex-start; }
 .dd__detail { color: var(--text-3); font-weight: 400; }
 .dd__caret { margin-left: auto; font-size: 9px; }
-.dd__list { padding: 4px; min-width: 220px; display: flex; flex-direction: column; gap: 2px; }
+.dd__list { padding: 4px; min-width: 220px; flex-direction: column; gap: 2px; }
+.dd__list:popover-open { display: flex; }
 .dd__option {
   display: grid;
   grid-template-columns: 12px 16px 1fr auto;
