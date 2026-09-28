@@ -35,6 +35,11 @@ export function mountExportDialog(dialog: HTMLDialogElement, preview: PreviewApi
     if (phase.name === 'running') e.preventDefault();
   });
 
+  // A second Esc / Android back can still close the dialog; never keep rendering invisibly.
+  dialog.addEventListener('close', () => {
+    if (phase.name === 'running') job?.cancel();
+  });
+
   function info(): string {
     const scene = buildScene();
     if (!scene) return '';
