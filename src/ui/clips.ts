@@ -75,6 +75,7 @@ export function mountClips(root: HTMLElement, pickFiles: () => void): void {
     // Once a long-press drag has started, the strip must not scroll under the finger.
     el.addEventListener('touchmove', (e) => { if (active) e.preventDefault(); }, { passive: false });
     el.addEventListener('keydown', (e) => {
+      if (e.target !== el) return; // keys on the nested × button keep their native click
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selected.set(index); }
       else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeImage(index); }
       else if (e.key === 'ArrowLeft' && index > 0) moveImage(index, index - 1);
