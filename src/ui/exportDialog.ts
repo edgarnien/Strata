@@ -7,6 +7,7 @@ import { exporting, images, playing, selected, settings } from '../state/store';
 import { h } from './dom';
 import type { PreviewApi } from './preview';
 import { buildScene } from './scene';
+import { toast } from './toast';
 
 type Kind = 'video' | 'png';
 type Phase =
@@ -90,7 +91,13 @@ export function mountExportDialog(dialog: HTMLDialogElement, preview: PreviewApi
         const file = phase.file;
         if (phase.shared) {
           actions.append(
-            h('button', { class: 'btn btn--solid', type: 'button', onclick: () => void shareFile(file).catch(() => {}) }, 'SAVE / SHARE'),
+            h('button', {
+              class: 'btn btn--solid',
+              type: 'button',
+              onclick: () => void shareFile(file).catch((err: unknown) => {
+                if (!(err instanceof DOMException && err.name === 'AbortError')) toast(`Sharing failed: ${messageOf(err)}`, 'error');
+              }),
+            }, 'SAVE / SHARE'),
             h('button', { class: 'btn btn--ghost', type: 'button', onclick: () => downloadFile(file) }, 'DOWNLOAD FILE'),
           );
         } else {
