@@ -5,10 +5,12 @@ const MOBILE = '(width <= 768px)';
  * (tools sit at the bottom of the screen), below it on desktop.
  */
 export function anchorPopover(pop: HTMLElement, anchor: HTMLElement, opts: { matchWidth?: boolean; onOpen?: () => void } = {}): void {
+  anchor.setAttribute('aria-expanded', 'false');
   pop.addEventListener('beforetoggle', (e) => {
     if (e.newState === 'open') pop.style.visibility = 'hidden';
   });
   pop.addEventListener('toggle', (e) => {
+    anchor.setAttribute('aria-expanded', String(e.newState === 'open'));
     if (e.newState !== 'open') return;
     const r = anchor.getBoundingClientRect();
     const gap = 6;
