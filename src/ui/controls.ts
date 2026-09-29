@@ -3,13 +3,12 @@ import { MOTIONS } from '../engine/motions';
 import type { FormatId, MotionId, Settings } from '../engine/types';
 import { RANGES, type RangeKey } from '../state/settings';
 import { effect } from '../state/signal';
-import { images, patchSettings, resetSettings, settings } from '../state/store';
+import { images, patchSettings, settings } from '../state/store';
 import { normalizeHex } from '../util/color';
 import { colorWheel } from './colorWheel';
 import { h } from './dom';
 import { dropdown } from './dropdown';
 import { anchorPopover } from './popover';
-import { toast } from './toast';
 
 const label = (text: string, value?: HTMLElement | null) =>
   h('div', { class: 'field__label' }, h('span', {}, text), value ?? null);
@@ -44,25 +43,18 @@ export function loopsControl(): HTMLElement {
     minus.disabled = loops <= min;
     plus.disabled = loops >= max;
   });
-  return h('div', { class: 'field' }, label('LOOPS'), h('div', { class: 'stepper' }, minus, value, plus));
+  return h('div', { class: 'field field--inline' }, label('LOOPS'), h('div', { class: 'stepper' }, minus, value, plus));
 }
 
 export function removeControl(): HTMLElement {
-  const flip = () => patchSettings({ removeFront: !settings.get().removeFront });
-  const toggle = h('button', { class: 'btn', type: 'button', onclick: flip });
-  const swap = h('button', {
-    class: 'btn btn--icon',
-    type: 'button',
-    title: 'Switch back / front',
-    'aria-label': 'Switch between remove back and remove front',
-    onclick: flip,
-  }, '⇄');
-  effect([settings], () => {
-    toggle.textContent = settings.get().removeFront ? 'REMOVE FRONT' : 'REMOVE BACK';
-  });
+  const side = (removeFront: boolean, text: string) => {
+    const btn = h('button', { class: 'btn', type: 'button', onclick: () => patchSettings({ removeFront }) }, text);
+    effect([settings], () => btn.setAttribute('aria-pressed', String(settings.get().removeFront === removeFront)));
+    return btn;
+  };
   return h('div', { class: 'field' },
     label('REMOVE'),
-    h('div', { class: 'row' }, toggle, swap),
+    h('div', { class: 'segmented', role: 'group', 'aria-label': 'Remove' }, side(false, 'BACK'), side(true, 'FRONT')),
     sliderControl({ label: 'SENSITIVITY', key: 'sensitivity' }));
 }
 
@@ -73,7 +65,7 @@ export function colorControl(): HTMLElement {
   const pop = h('div', { class: 'popover' }, wheel.el);
   pop.popover = 'auto';
   swatch.popoverTargetElement = pop;
-  anchorPopover(pop, swatch, { onOpen: wheel.redraw });
+  anchorPopover(pop, swatch, { beside: () => swatch.closest<HTMLElement>('.sidebar') });
 
   input.addEventListener('input', () => {
     const hex = normalizeHex(input.value);
@@ -86,18 +78,21 @@ export function colorControl(): HTMLElement {
     const c = settings.get().color;
     if (document.activeElement !== input) input.value = c;
     swatch.style.setProperty('--swatch', c);
+    wheel.set(c);
   });
-  return h('div', { class: 'field' }, label('COLOR'), h('div', { class: 'color' }, input, swatch, pop));
+  return h('div', { class: 'field' }, label('COLOR'), h('div', { class: 'color' }, swatch, input, pop));
 }
 
 export function imgMaskControl(): HTMLElement {
-  const btn = h('button', { class: 'btn', type: 'button', onclick: () => patchSettings({ imgMask: !settings.get().imgMask }) });
-  effect([settings], () => {
-    const on = settings.get().imgMask;
-    btn.textContent = `IMG MASK: ${on ? 'ON' : 'OFF'}`;
-    btn.setAttribute('aria-pressed', String(on));
+  const toggle = h('button', {
+    class: 'switch',
+    type: 'button',
+    role: 'switch',
+    'aria-label': 'Img mask',
+    onclick: () => patchSettings({ imgMask: !settings.get().imgMask }),
   });
-  return h('div', { class: 'field' }, label('IMG MASK'), btn);
+  effect([settings], () => toggle.setAttribute('aria-checked', String(settings.get().imgMask)));
+  return h('div', { class: 'field field--inline' }, label('IMG MASK'), toggle);
 }
 
 export function motionControl(): HTMLElement {
@@ -121,16 +116,4 @@ export function formatControl(): HTMLElement {
     onSelect: (format) => patchSettings({ format }),
     deps: [settings, images],
   });
-}
-
-export function resetControl(): HTMLElement {
-  return h('div', { class: 'field' },
-    h('button', {
-      class: 'btn btn--ghost',
-      type: 'button',
-      onclick: () => {
-        resetSettings();
-        toast('Settings reset');
-      },
-    }, '↺ RESET SETTINGS'));
 }

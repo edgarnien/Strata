@@ -1,9 +1,9 @@
 import { images, type ToolId } from '../state/store';
 import {
-  colorControl, formatControl, imgMaskControl, loopsControl, motionControl, removeControl, resetControl, sliderControl,
+  colorControl, formatControl, imgMaskControl, loopsControl, motionControl, removeControl, sliderControl,
 } from './controls';
 
-export type GroupId = 'adjust' | 'background' | 'color' | 'motion' | 'format' | 'actions';
+export type GroupId = 'adjust' | 'background' | 'color' | 'motion' | 'format';
 
 export interface ToolDef {
   id: ToolId;
@@ -14,16 +14,6 @@ export interface ToolDef {
   build: () => HTMLElement;
   visible?: () => boolean;
 }
-
-/** Desktop group headings; FORMAT carries its own label above the dropdown. */
-export const GROUP_LABELS: Record<GroupId, string> = {
-  adjust: 'ADJUST',
-  background: 'BACKGROUND',
-  color: 'COLOR',
-  motion: 'MOTION',
-  format: '',
-  actions: '',
-};
 
 /** Single source for the desktop sidebar and the mobile toolbar, in toolbar order. */
 export const TOOLS: readonly ToolDef[] = [
@@ -37,5 +27,4 @@ export const TOOLS: readonly ToolDef[] = [
   { id: 'speed', label: 'Speed', icon: '»', group: 'motion', build: () => sliderControl({ label: 'SPEED', key: 'speed', readout: (v) => `${v.toFixed(1)}×` }) },
   { id: 'loops', label: 'Loops', icon: '⟳', group: 'motion', build: loopsControl },
   { id: 'format', label: 'Format', icon: '▯', group: 'format', build: formatControl },
-  { id: 'reset', label: 'Reset', icon: '↺', group: 'actions', build: resetControl },
 ];

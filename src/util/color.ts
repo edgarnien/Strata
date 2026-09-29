@@ -3,63 +3,53 @@ export function normalizeHex(input: string): string | null {
   return /^#[0-9A-F]{6}$/.test(hex) ? hex : null;
 }
 
-export function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
-  h /= 360;
-  s /= 100;
-  l /= 100;
-  const hue2rgb = (p: number, q: number, t: number) => {
-    if (t < 0) t += 1;
-    if (t > 1) t -= 1;
-    if (t < 1 / 6) return p + (q - p) * 6 * t;
-    if (t < 1 / 2) return q;
-    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-    return p;
-  };
-  let r: number, g: number, b: number;
-  if (s === 0) {
-    r = g = b = l;
-  } else {
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    r = hue2rgb(p, q, h + 1 / 3);
-    g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1 / 3);
-  }
-  return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
-}
-
 export function rgbToHex(r: number, g: number, b: number): string {
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
 }
 
-export function hslToHex(h: number, s: number, l: number): string {
-  const { r, g, b } = hslToRgb(h, s, l);
-  return rgbToHex(r, g, b);
+/** h 0–360, s and v 0–100. */
+export function hsvToHex(h: number, s: number, v: number): string {
+  const sat = s / 100;
+  const val = v / 100;
+  const channel = (n: number) => {
+    const k = (n + h / 60) % 6;
+    return Math.round((val - val * sat * Math.max(0, Math.min(k, 4 - k, 1))) * 255);
+  };
+  return rgbToHex(channel(5), channel(3), channel(1));
 }
 
-/** Inner radius (as a share of the wheel radius) of the black/white centre. */
-export const WHEEL_INNER = 0.3;
-
-export interface WheelPick {
-  hex: string;
-  hue: number | null;
-  saturation: number | null;
-  /** Cursor position relative to the wheel centre. */
-  cursor: { x: number; y: number };
-}
-
-/** Colour under (dx, dy) relative to the wheel centre. brightness 0–100 (100 = pure hue). */
-export function pickFromWheel(dx: number, dy: number, radius: number, brightness: number): WheelPick {
-  const inner = radius * WHEEL_INNER;
-  const dist = Math.hypot(dx, dy);
-  if (dist <= inner) {
-    const left = dx < 0;
-    return { hex: left ? '#000000' : '#FFFFFF', hue: null, saturation: null, cursor: { x: (left ? -1 : 1) * radius * 0.15, y: 0 } };
+/** Inverse of hsvToHex; hue and saturation are 0 where they are undefined (greys, black). */
+export function hexToHsv(hex: string): { h: number; s: number; v: number } {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  let h = 0;
+  if (d > 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
   }
-  const clamped = Math.min(dist, radius);
-  const k = clamped / dist;
+  return { h, s: max === 0 ? 0 : (d / max) * 100, v: max * 100 };
+}
+
+/**
+ * Hue and saturation under (dx, dy) relative to the wheel centre: hue runs clockwise from the
+ * right (screen y points down), saturation grows from the white centre to the rim.
+ */
+export function pickFromWheel(dx: number, dy: number, radius: number): { hue: number; saturation: number } {
   let hue = (Math.atan2(dy, dx) * 180) / Math.PI;
   if (hue < 0) hue += 360;
-  const saturation = Math.min(100, ((clamped - inner) / (radius - inner)) * 100);
-  return { hex: hslToHex(hue, saturation, brightness / 2), hue, saturation, cursor: { x: dx * k, y: dy * k } };
+  return { hue, saturation: Math.min(100, (Math.hypot(dx, dy) / radius) * 100) };
+}
+
+/** Where a hue/saturation sits on a wheel of radius 1, relative to its centre. */
+export function wheelPoint(hue: number, saturation: number): { x: number; y: number } {
+  const a = (hue * Math.PI) / 180;
+  const r = saturation / 100;
+  return { x: r * Math.cos(a), y: r * Math.sin(a) };
 }
