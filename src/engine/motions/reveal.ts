@@ -11,22 +11,13 @@ export const reveal: Motion = {
   draw(ctx, f) {
     const total = f.bars.length;
     if (f.imgMask) {
-      // 0→0.5: the next image appears bar by bar; 0.5→1: the bars settle into the clear photo.
-      const appear = Math.min(1, f.progress * 2);
-      const settle = f.progress > 0.5 ? (f.progress - 0.5) * 2 : 0;
+      // The next image fades in bar by bar over the whole cycle; the last bar is in just before it ends.
+      const appear = f.progress * (1 + WAVE_WIDTH);
       const opaque: Bar[] = [];
       f.bars.forEach((bar, i) => {
-        const pos = i / total;
-        const barAlpha = clamp01((appear - pos) / WAVE_WIDTH);
-        if (barAlpha <= 0) return;
-        const clearAlpha = f.progress > 0.5 ? clamp01((settle - pos) / WAVE_WIDTH) : 0;
-        const pixAlpha = barAlpha * (1 - clearAlpha);
-        if (pixAlpha >= 1 || barAlpha * clearAlpha >= 1) {
-          opaque.push(bar);
-          return;
-        }
-        if (pixAlpha > 0) drawInBar(ctx, bar, f.nextImage, f.width, f.height, f.fit, pixAlpha);
-        if (clearAlpha > 0) drawInBar(ctx, bar, f.nextImage, f.width, f.height, f.fit, barAlpha * clearAlpha);
+        const alpha = clamp01((appear - i / total) / WAVE_WIDTH);
+        if (alpha >= 1) opaque.push(bar);
+        else if (alpha > 0) drawInBar(ctx, bar, f.nextImage, f.width, f.height, f.fit, alpha);
       });
       // Fully shown bars share one clip path, so they meet without seams.
       clipDraw(ctx, opaque, f.nextImage, f.width, f.height, f.fit);

@@ -3,7 +3,7 @@ import { MOTIONS } from '../engine/motions';
 import type { FormatId, MotionId, Settings } from '../engine/types';
 import { RANGES, type RangeKey } from '../state/settings';
 import { effect } from '../state/signal';
-import { images, patchSettings, settings } from '../state/store';
+import { colorLocked, images, patchSettings, settings } from '../state/store';
 import { normalizeHex } from '../util/color';
 import { colorWheel } from './colorWheel';
 import { h } from './dom';
@@ -80,7 +80,17 @@ export function colorControl(): HTMLElement {
     swatch.style.setProperty('--swatch', c);
     wheel.set(c);
   });
-  return h('div', { class: 'field' }, label('COLOR'), h('div', { class: 'color' }, swatch, input, pop));
+  const hint = h('span', {});
+  const field = h('div', { class: 'field' }, label('COLOR', hint), h('div', { class: 'color' }, swatch, input, pop));
+  effect([settings, images], () => {
+    const locked = colorLocked();
+    field.classList.toggle('is-disabled', locked);
+    hint.textContent = locked ? 'OFF · IMG MASK' : '';
+    input.disabled = locked;
+    swatch.disabled = locked;
+    if (locked && pop.matches(':popover-open')) pop.hidePopover();
+  });
+  return field;
 }
 
 export function imgMaskControl(): HTMLElement {

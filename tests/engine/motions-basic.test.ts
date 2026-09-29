@@ -53,10 +53,12 @@ describe('REVEAL', () => {
     const partial = calls.filter((c) => c.startsWith('drawImage cur') && !c.endsWith('1.000'));
     expect(count(calls, 'drawImage cur')).toBe(partial.length + 1);
   });
-  it('IMG MASK lets the next image appear bar by bar', () => {
-    const calls = record((ctx) => reveal.draw(ctx, frame({ progress: 0.25, imgMask: true })));
-    expect(count(calls, 'rect ')).toBe(50);
-    expect(count(calls, 'drawImage next 0.00 0.00 100.00 300.00 0.00 0.00 100.00 300.00 1.000')).toBe(1);
+  it('IMG MASK lets the next image appear bar by bar, all of it just before the cycle ends', () => {
+    const calls = record((ctx) => reveal.draw(ctx, frame({ progress: 0.999, imgMask: true })));
+    expect(count(calls, 'rect ')).toBe(100);
+    expect(calls.filter((c) => c.startsWith('drawImage'))).toEqual([
+      'drawImage next 0.00 0.00 100.00 300.00 0.00 0.00 100.00 300.00 1.000',
+    ]);
     expect(count(calls, 'fillRect')).toBe(0);
   });
 });

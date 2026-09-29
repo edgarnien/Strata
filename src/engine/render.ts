@@ -1,7 +1,7 @@
 import { drawFitted, fillBars } from './draw';
 import { motionById } from './motions';
 import { hashSeed, mulberry32, shuffled } from './rng';
-import { positionAt, totalDuration } from './timeline';
+import { cycleDuration, positionAt, totalDuration } from './timeline';
 import type { Bar, Ctx2D, Fit, Settings } from './types';
 
 export interface ImageLayer {
@@ -34,8 +34,13 @@ function barOrder(bars: readonly Bar[], seed: number, imageIndex: number): Bar[]
   return order;
 }
 
+/** IMG MASK needs a next clip to reveal. */
+export function imgMaskOn(settings: Pick<Settings, 'imgMask'>, clipCount: number): boolean {
+  return settings.imgMask && clipCount >= 2;
+}
+
 export function imgMaskActive(scene: Scene): boolean {
-  return scene.settings.imgMask && scene.layers.length >= 2;
+  return imgMaskOn(scene.settings, scene.layers.length);
 }
 
 export function sceneDuration(scene: Scene): number {
@@ -79,12 +84,18 @@ export function renderFrame(ctx: Ctx2D, scene: Scene, t: number): number {
   return pos.imageIndex;
 }
 
-/** The static stroke picture of one clip (animation stopped). */
+/**
+ * The picture of one clip while the animation is stopped: every stroke bar in the stroke colour,
+ * or with IMG MASK (which draws no colour) the frame halfway through that clip's cycle.
+ */
 export function renderStill(ctx: Ctx2D, scene: Scene, index: number): void {
   const n = scene.layers.length;
   if (n === 0) return;
   const i = Math.min(Math.max(0, index), n - 1);
-  const imgMask = imgMaskActive(scene);
-  paintBase(ctx, scene, scene.layers[imgMask ? (i + 1) % n : i].bitmap);
+  if (imgMaskActive(scene)) {
+    renderFrame(ctx, scene, (i + 0.5) * cycleDuration(scene.settings.speed));
+    return;
+  }
+  paintBase(ctx, scene, scene.layers[i].bitmap);
   fillBars(ctx, scene.layers[i].strokeBars, scene.settings.color);
 }

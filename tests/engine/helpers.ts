@@ -73,3 +73,31 @@ export const TEST_SETTINGS: Settings = {
   size: 80, stretch: 0, threshold: 35, removeFront: false, sensitivity: 50, color: '#FFFFFF',
   imgMask: false, motion: 'buildUp', speed: 1, loops: 1, format: '9:16',
 };
+
+/**
+ * Share of `bars` a motion covers: stroke fills, plus next-image draws clipped to bars; draws of
+ * the current image (REVEAL clearing a bar) count against it.
+ */
+export function coverage(draw: (ctx: Ctx2D) => void, bars: number): number {
+  let pending = 0;
+  let clipped = 0;
+  let covered = 0;
+  const ctx = {
+    globalAlpha: 1,
+    fillStyle: '',
+    save() {},
+    restore() { ctx.globalAlpha = 1; },
+    clearRect() {},
+    beginPath() { pending = 0; },
+    rect() { pending++; },
+    clip() { clipped = pending; },
+    fill() { covered += pending * ctx.globalAlpha; },
+    fillRect() { covered += ctx.globalAlpha; },
+    drawImage(img: { id: string }) {
+      covered += (img.id === 'cur' ? -clipped : clipped) * ctx.globalAlpha;
+      clipped = 0;
+    },
+  };
+  draw(ctx as unknown as Ctx2D);
+  return covered / bars;
+}

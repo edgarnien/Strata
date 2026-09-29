@@ -1,3 +1,4 @@
+import { imgMaskOn } from '../engine/render';
 import { randomSeed } from '../engine/rng';
 import type { Settings } from '../engine/types';
 import { loadSettings, saveSettings } from './settings';
@@ -24,6 +25,11 @@ export const shownClip = signal(0);
 export const seed = signal(randomSeed());
 export const activeTool = signal<ToolId>('size');
 export const exporting = signal(false);
+
+/** IMG MASK reveals the next clip instead of drawing strokes, so the stroke colour has no say. */
+export function colorLocked(): boolean {
+  return imgMaskOn(settings.get(), images.get().length);
+}
 
 export function patchSettings(patch: Partial<Settings>): void {
   settings.update((s) => ({ ...s, ...patch }));

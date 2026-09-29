@@ -1,4 +1,4 @@
-import { images, type ToolId } from '../state/store';
+import { colorLocked, images, type ToolId } from '../state/store';
 import {
   colorControl, formatControl, imgMaskControl, loopsControl, motionControl, removeControl, sliderControl,
 } from './controls';
@@ -13,6 +13,8 @@ export interface ToolDef {
   group: GroupId;
   build: () => HTMLElement;
   visible?: () => boolean;
+  /** Greyed out in the toolbar while this returns true (the control locks itself). */
+  locked?: () => boolean;
 }
 
 /** Single source for the desktop sidebar and the mobile toolbar, in toolbar order. */
@@ -21,7 +23,7 @@ export const TOOLS: readonly ToolDef[] = [
   { id: 'stretch', label: 'Stretch', icon: '↔', group: 'adjust', build: () => sliderControl({ label: 'STRETCH', key: 'stretch' }) },
   { id: 'threshold', label: 'Thresh.', icon: '◐', group: 'adjust', build: () => sliderControl({ label: 'THRESHOLD', key: 'threshold' }) },
   { id: 'remove', label: 'Remove', icon: '✂', group: 'background', build: removeControl },
-  { id: 'color', label: 'Color', icon: '●', group: 'color', build: colorControl },
+  { id: 'color', label: 'Color', icon: '●', group: 'color', build: colorControl, locked: colorLocked },
   { id: 'imgMask', label: 'Img Mask', icon: '◧', group: 'color', build: imgMaskControl, visible: () => images.get().length >= 2 },
   { id: 'motion', label: 'Motion', icon: '∿', group: 'motion', build: motionControl },
   { id: 'speed', label: 'Speed', icon: '»', group: 'motion', build: () => sliderControl({ label: 'SPEED', key: 'speed', readout: (v) => `${v.toFixed(1)}×` }) },

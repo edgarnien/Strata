@@ -41,6 +41,8 @@
 }
 .field__value { color: var(--text); font-variant-numeric: tabular-nums; }
 .field--inline { flex-direction: row; align-items: center; justify-content: space-between; }
+.field.is-disabled > :not(.field__label) { opacity: .35; }
+.field.is-disabled :disabled { cursor: default; }
 
 /* ---------- range ---------- */
 .range {
@@ -222,15 +224,27 @@
 .dd__icon { color: var(--text-2); text-align: center; }
 
 /* ---------- sidebar ---------- */
-/* Denser than the mobile panel (no touch targets to keep) so everything fits without scrolling. */
+/*
+ * Denser than the mobile panel (no touch targets to keep) so everything fits without scrolling.
+ * --air adds breathing room as the window gets taller: none up to 690px, 14px from ~970px. The
+ * spacing grows slower than the window, so the sidebar never starts to scroll on the way up.
+ */
 .sidebar {
-  & .field { gap: 6px; }
+  --air: clamp(0px, (100dvh - 690px) / 20, 14px);
+
+  & .field { gap: calc(6px + var(--air) * .25); }
   & .range { height: 18px; }
   & :is(.btn, .color) { min-height: 34px; height: 34px; padding-block: 0; }
   & .stepper__btn { width: 30px; min-height: 30px; height: 30px; }
 }
-.sidebar__logo { font-weight: 700; letter-spacing: .14em; font-size: 13px; padding-bottom: 10px; }
-.group { display: flex; flex-direction: column; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); }
+.sidebar__logo { font-weight: 700; letter-spacing: .14em; font-size: 13px; padding-bottom: calc(10px + var(--air) * .5); }
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px + var(--air) * .5);
+  padding: calc(10px + var(--air) * .75) 0;
+  border-top: 1px solid var(--line);
+}
 .sidebar__export { flex: none; width: 100%; margin-top: auto; }
 
 /* ---------- transport ---------- */
@@ -352,6 +366,7 @@
   cursor: pointer;
 
   &.is-active { color: var(--text); background: var(--surface-3); }
+  &.is-locked { opacity: .4; }
 }
 .tool__icon {
   width: 26px;
