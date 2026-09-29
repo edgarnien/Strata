@@ -23,12 +23,19 @@ export function drawFitted(ctx: Ctx2D, img: ImageBitmap, width: number, height: 
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height);
 }
 
+/**
+ * Fills the bars as one path. Filled one by one, neighbours that meet on a fractional device
+ * pixel (the scaled-down preview) each cover only part of it and leave a faint seam.
+ */
 export function fillBars(ctx: Ctx2D, bars: readonly Bar[], color: string, count = bars.length): void {
+  if (count <= 0) return;
   ctx.fillStyle = color;
+  ctx.beginPath();
   for (let i = 0; i < count; i++) {
     const b = bars[i];
-    ctx.fillRect(b.x, b.y, b.width, b.height);
+    ctx.rect(b.x, b.y, b.width, b.height);
   }
+  ctx.fill();
 }
 
 /** Draws `img` only inside the union of `bars` (IMG MASK reveal). */

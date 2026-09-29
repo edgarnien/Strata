@@ -1,16 +1,16 @@
 import { effect } from '../state/signal';
 import { exporting, images } from '../state/store';
 import { h } from './dom';
-import { GROUP_LABELS, TOOLS, type GroupId } from './tools';
+import { TOOLS, type GroupId } from './tools';
 
+/** Desktop: every control at once, in groups split by hairlines; EXPORT sits at the bottom. */
 export function mountSidebar(root: HTMLElement, openExport: () => void): void {
   root.append(h('div', { class: 'sidebar__logo' }, 'STRATA'));
   const groups = new Map<GroupId, HTMLElement>();
   for (const tool of TOOLS) {
     let group = groups.get(tool.group);
     if (!group) {
-      const heading = GROUP_LABELS[tool.group];
-      group = h('section', { class: `group group--${tool.group}` }, heading ? h('h2', { class: 'group__label' }, heading) : null);
+      group = h('section', { class: `group group--${tool.group}` });
       groups.set(tool.group, group);
       root.append(group);
     }

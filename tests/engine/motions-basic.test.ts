@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { buildUp } from '../../src/engine/motions/buildUp';
 import { fade } from '../../src/engine/motions/fade';
+import { fillBars } from '../../src/engine/draw';
 import { reveal } from '../../src/engine/motions/reveal';
 import { RecordingCtx, count, frame, record } from './helpers';
 
 describe('BUILD UP', () => {
-  const fills = (progress: number) => count(record((ctx) => buildUp.draw(ctx, frame({ progress }))), 'fillRect');
+  const fills = (progress: number) => count(record((ctx) => buildUp.draw(ctx, frame({ progress }))), 'rect ');
   it('rises to all bars at half-cycle and falls back symmetrically', () => {
     expect(fills(0)).toBe(0);
     expect(fills(0.25)).toBe(50);
@@ -21,10 +22,18 @@ describe('BUILD UP', () => {
 });
 
 describe('FADE', () => {
-  it('is fully in at half-cycle and gone at the end', () => {
+  it('is fully in at half-cycle, as one seamless path, and gone at the end', () => {
     const mid = record((ctx) => fade.draw(ctx, frame({ progress: 0.5 })));
-    expect(mid.filter((c) => c.startsWith('fillRect') && c.endsWith('1.000'))).toHaveLength(100);
-    expect(count(record((ctx) => fade.draw(ctx, frame({ progress: 0.999 }))), 'fillRect')).toBe(0);
+    expect(count(mid, 'rect ')).toBe(100);
+    expect(mid.filter((c) => c.startsWith('fill '))).toEqual(['fill #FFFFFF 1.000']);
+    expect(count(mid, 'fillRect')).toBe(0);
+    const end = record((ctx) => fade.draw(ctx, frame({ progress: 0.999 })));
+    expect(count(end, 'rect ') + count(end, 'fillRect')).toBe(0);
+  });
+  it('draws only the bars still fading one by one', () => {
+    const calls = record((ctx) => fade.draw(ctx, frame({ progress: 0.3 })));
+    expect(calls.filter((c) => c.startsWith('fillRect')).every((c) => !c.endsWith('1.000'))).toBe(true);
+    expect(count(calls, 'fill ')).toBe(1);
   });
   it('restores globalAlpha', () => {
     const r = new RecordingCtx();
@@ -36,12 +45,18 @@ describe('FADE', () => {
 describe('REVEAL', () => {
   it('fills every bar and clears the first half at progress 0.25', () => {
     const calls = record((ctx) => reveal.draw(ctx, frame({ progress: 0.25 })));
-    expect(count(calls, 'fillRect')).toBe(100);
-    expect(count(calls, 'drawImage cur')).toBe(50);
+    expect(calls.slice(0, 102)).toEqual(record((ctx) => fillBars(ctx, frame().bars, '#FFFFFF')));
+    expect(count(calls.slice(102), 'rect ')).toBe(50);
+  });
+  it('clears the fully revealed bars with one image draw', () => {
+    const calls = record((ctx) => reveal.draw(ctx, frame({ progress: 0.25 })));
+    const partial = calls.filter((c) => c.startsWith('drawImage cur') && !c.endsWith('1.000'));
+    expect(count(calls, 'drawImage cur')).toBe(partial.length + 1);
   });
   it('IMG MASK lets the next image appear bar by bar', () => {
     const calls = record((ctx) => reveal.draw(ctx, frame({ progress: 0.25, imgMask: true })));
-    expect(count(calls, 'drawImage next')).toBe(50);
+    expect(count(calls, 'rect ')).toBe(50);
+    expect(count(calls, 'drawImage next 0.00 0.00 100.00 300.00 0.00 0.00 100.00 300.00 1.000')).toBe(1);
     expect(count(calls, 'fillRect')).toBe(0);
   });
 });

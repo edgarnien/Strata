@@ -23,10 +23,10 @@ body {
   grid-area: sidebar;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding: 20px var(--gutter);
+  padding: 16px var(--gutter) 14px;
   background: var(--surface);
   border-right: 1px solid var(--line);
+  /* Fits without scrolling from ~680px window height; below that it scrolls instead of clipping. */
   overflow-y: auto;
 }
 

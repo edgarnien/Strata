@@ -1,6 +1,6 @@
 import { randomSeed } from '../engine/rng';
 import type { Settings } from '../engine/types';
-import { DEFAULT_SETTINGS, loadSettings, saveSettings } from './settings';
+import { loadSettings, saveSettings } from './settings';
 import { signal } from './signal';
 
 export interface ImageEntry {
@@ -12,7 +12,7 @@ export interface ImageEntry {
 
 export type ToolId =
   | 'size' | 'stretch' | 'threshold' | 'remove' | 'color' | 'imgMask'
-  | 'motion' | 'speed' | 'loops' | 'format' | 'reset';
+  | 'motion' | 'speed' | 'loops' | 'format';
 
 export const settings = signal<Settings>(loadSettings());
 export const images = signal<readonly ImageEntry[]>([]);
@@ -27,10 +27,6 @@ export const exporting = signal(false);
 
 export function patchSettings(patch: Partial<Settings>): void {
   settings.update((s) => ({ ...s, ...patch }));
-}
-
-export function resetSettings(): void {
-  settings.set({ ...DEFAULT_SETTINGS });
 }
 
 settings.subscribe((s) => saveSettings(s));
