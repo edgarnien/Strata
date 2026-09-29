@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderFrame, renderStill, sceneDuration, type ImageLayer, type Scene } from '../../src/engine/render';
+import { imgMaskOn, renderFrame, renderStill, sceneDuration, type ImageLayer, type Scene } from '../../src/engine/render';
 import type { Settings } from '../../src/engine/types';
 import { RecordingCtx, TEST_SETTINGS, count, fakeImage, record, testBars } from './helpers';
 
@@ -62,9 +62,19 @@ describe('renderStill', () => {
     expect(count(calls, 'rect ')).toBe(50);
     expect(calls.at(-1)).toBe('fill #FF0000 1.000');
   });
-  it('IMG MASK shows the next clip behind the strokes', () => {
-    const calls = record((ctx) => renderStill(ctx, scene(['a', 'b'], { imgMask: true }), 0));
-    expect(calls[1]).toBe('fillRect 0 0 100 300 #000000 1.000');
+  it('IMG MASK shows the frame halfway through the clip, with no stroke colour', () => {
+    const sc = scene(['a', 'b'], { imgMask: true, color: '#FF0000', speed: 2 });
+    const calls = record((ctx) => renderStill(ctx, sc, 1));
+    expect(calls).toEqual(record((ctx) => renderFrame(ctx, sc, 1.5 * 3))); // clip 1, cycle 3 s long
+    expect(calls.some((c) => c.includes('#FF0000'))).toBe(false);
     expect(calls[2]).toMatch(/^drawImage b /);
+  });
+});
+
+describe('imgMaskOn', () => {
+  it('needs the setting and a next clip to reveal', () => {
+    expect(imgMaskOn({ imgMask: true }, 2)).toBe(true);
+    expect(imgMaskOn({ imgMask: true }, 1)).toBe(false);
+    expect(imgMaskOn({ imgMask: false }, 3)).toBe(false);
   });
 });

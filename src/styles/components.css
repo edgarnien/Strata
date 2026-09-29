@@ -41,6 +41,8 @@
 }
 .field__value { color: var(--text); font-variant-numeric: tabular-nums; }
 .field--inline { flex-direction: row; align-items: center; justify-content: space-between; }
+.field.is-disabled > :not(.field__label) { opacity: .35; }
+.field.is-disabled :disabled { cursor: default; }
 
 /* ---------- range ---------- */
 .range {
@@ -352,6 +354,7 @@
   cursor: pointer;
 
   &.is-active { color: var(--text); background: var(--surface-3); }
+  &.is-locked { opacity: .4; }
 }
 .tool__icon {
   width: 26px;

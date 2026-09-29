@@ -1,5 +1,5 @@
 import { effect } from '../state/signal';
-import { activeTool, images } from '../state/store';
+import { activeTool, images, settings } from '../state/store';
 import { h } from './dom';
 import { TOOLS } from './tools';
 
@@ -18,7 +18,7 @@ export function mountToolbar(bar: HTMLElement, panel: HTMLElement): void {
     bar.append(btn);
     panel.append(pane);
 
-    effect([activeTool, images], () => {
+    effect([activeTool, images, settings], () => {
       const visible = tool.visible ? tool.visible() : true;
       if (!visible && activeTool.get() === tool.id) {
         activeTool.set('size');
@@ -26,6 +26,7 @@ export function mountToolbar(bar: HTMLElement, panel: HTMLElement): void {
       }
       const active = visible && activeTool.get() === tool.id;
       btn.hidden = !visible;
+      btn.classList.toggle('is-locked', tool.locked?.() ?? false);
       btn.classList.toggle('is-active', active);
       btn.setAttribute('aria-pressed', String(active));
       pane.hidden = !active;
