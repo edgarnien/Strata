@@ -20,6 +20,7 @@ export class RecordingCtx {
   beginPath(): void { this.calls.push('beginPath'); }
   rect(x: number, y: number, w: number, h: number): void { this.calls.push(`rect ${x} ${y} ${w} ${h}`); }
   clip(): void { this.calls.push('clip'); }
+  fill(): void { this.calls.push(`fill ${this.fillStyle} ${this.globalAlpha.toFixed(3)}`); }
   clearRect(x: number, y: number, w: number, h: number): void { this.calls.push(`clearRect ${x} ${y} ${w} ${h}`); }
   fillRect(x: number, y: number, w: number, h: number): void {
     this.calls.push(`fillRect ${x} ${y} ${w} ${h} ${this.fillStyle} ${this.globalAlpha.toFixed(3)}`);

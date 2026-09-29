@@ -1,4 +1,5 @@
-import { clamp01, clipDraw, drawInBar } from '../draw';
+import { clamp01, clipDraw, drawInBar, fillBars } from '../draw';
+import type { Bar } from '../types';
 import type { Motion } from './types';
 
 const FADE_ZONE = 0.2;
@@ -21,14 +22,20 @@ export const fade: Motion = {
     }
     const fadeIn = f.progress <= 0.5;
     const phase = fadeIn ? f.progress * 2 : (f.progress - 0.5) * 2;
+    const solid: Bar[] = [];
     ctx.fillStyle = f.color;
     f.bars.forEach((bar, i) => {
       const pos = i / total;
       const alpha = fadeIn ? clamp01(1 - (pos - phase) / FADE_ZONE) : clamp01((pos - phase) / FADE_ZONE);
       if (alpha <= 0) return;
+      if (alpha >= 1) {
+        solid.push(bar);
+        return;
+      }
       ctx.globalAlpha = alpha;
       ctx.fillRect(bar.x, bar.y, bar.width, bar.height);
     });
     ctx.globalAlpha = 1;
+    fillBars(ctx, solid, f.color);
   },
 };

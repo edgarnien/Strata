@@ -16,12 +16,17 @@ describe('drawFitted', () => {
 });
 
 describe('fillBars / clipDraw', () => {
-  it('fills only the first `count` bars', () => {
+  it('fills the first `count` bars as one path, so shared edges get no anti-aliased seam', () => {
     expect(record((ctx) => fillBars(ctx, testBars(), '#FF0000', 3))).toEqual([
-      'fillRect 0 0 10 30 #FF0000 1.000',
-      'fillRect 0 30 10 30 #FF0000 1.000',
-      'fillRect 0 60 10 30 #FF0000 1.000',
+      'beginPath',
+      'rect 0 0 10 30',
+      'rect 0 30 10 30',
+      'rect 0 60 10 30',
+      'fill #FF0000 1.000',
     ]);
+  });
+  it('fillBars is a no-op without bars', () => {
+    expect(record((ctx) => fillBars(ctx, testBars(), '#FF0000', 0))).toEqual([]);
   });
   it('clipDraw is a no-op without bars', () => {
     expect(record((ctx) => clipDraw(ctx, [], fakeImage('n'), 100, 300, 'cover'))).toEqual([]);
