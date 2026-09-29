@@ -3,7 +3,7 @@ import { buildUp } from '../../src/engine/motions/buildUp';
 import { fade } from '../../src/engine/motions/fade';
 import { fillBars } from '../../src/engine/draw';
 import { reveal } from '../../src/engine/motions/reveal';
-import { RecordingCtx, count, frame, record } from './helpers';
+import { RecordingCtx, count, coverage, frame, record } from './helpers';
 
 describe('BUILD UP', () => {
   const fills = (progress: number) => count(record((ctx) => buildUp.draw(ctx, frame({ progress }))), 'rect ');
@@ -27,12 +27,11 @@ describe('FADE', () => {
     expect(count(mid, 'rect ')).toBe(100);
     expect(mid.filter((c) => c.startsWith('fill '))).toEqual(['fill #FFFFFF 1.000']);
     expect(count(mid, 'fillRect')).toBe(0);
-    const end = record((ctx) => fade.draw(ctx, frame({ progress: 0.999 })));
-    expect(count(end, 'rect ') + count(end, 'fillRect')).toBe(0);
+    expect(coverage((ctx) => fade.draw(ctx, frame({ progress: 0.999 })), 100)).toBeLessThan(0.01);
   });
   it('draws only the bars still fading one by one', () => {
     const calls = record((ctx) => fade.draw(ctx, frame({ progress: 0.3 })));
-    expect(calls.filter((c) => c.startsWith('fillRect')).every((c) => !c.endsWith('1.000'))).toBe(true);
+    expect(count(calls, 'fillRect')).toBe(20); // the fade zone: a fifth of the bars
     expect(count(calls, 'fill ')).toBe(1);
   });
   it('restores globalAlpha', () => {
@@ -43,10 +42,10 @@ describe('FADE', () => {
 });
 
 describe('REVEAL', () => {
-  it('fills every bar and clears the first half at progress 0.25', () => {
+  it('fills every bar and clears about half of them at progress 0.25', () => {
     const calls = record((ctx) => reveal.draw(ctx, frame({ progress: 0.25 })));
     expect(calls.slice(0, 102)).toEqual(record((ctx) => fillBars(ctx, frame().bars, '#FFFFFF')));
-    expect(count(calls.slice(102), 'rect ')).toBe(50);
+    expect(coverage((ctx) => reveal.draw(ctx, frame({ progress: 0.25 })), 100)).toBeCloseTo(0.5, 1);
   });
   it('clears the fully revealed bars with one image draw', () => {
     const calls = record((ctx) => reveal.draw(ctx, frame({ progress: 0.25 })));

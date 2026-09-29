@@ -1,41 +1,35 @@
-import { clamp01, clipDraw, drawInBar, fillBars } from '../draw';
+import { clipDraw, drawInBar, fillBars } from '../draw';
 import type { Bar } from '../types';
+import { paceLevel, ramp } from './pace';
 import type { Motion } from './types';
 
 const FADE_ZONE = 0.2;
 
-/** Strokes fade in over the first half and out over the second, staggered by bar order. */
+/** Strokes (or, with IMG MASK, the next clip) fade in bar by bar, staggered by bar order; they fade out in reverse. */
 export const fade: Motion = {
   id: 'fade',
   label: 'FADE',
   icon: '◑',
+  covered: 'middle',
   draw(ctx, f) {
     const total = f.bars.length;
-    if (f.imgMask) {
-      clipDraw(ctx, f.bars.filter((_, i) => i / total <= f.progress), f.nextImage, f.width, f.height, f.fit);
-      f.bars.forEach((bar, i) => {
-        const pos = i / total;
-        if (pos <= f.progress || pos > f.progress + FADE_ZONE) return;
-        drawInBar(ctx, bar, f.nextImage, f.width, f.height, f.fit, (f.progress + FADE_ZONE - pos) / FADE_ZONE);
-      });
-      return;
-    }
-    const fadeIn = f.progress <= 0.5;
-    const phase = fadeIn ? f.progress * 2 : (f.progress - 0.5) * 2;
+    const level = paceLevel(f.progress, f.imgMask);
     const solid: Bar[] = [];
     ctx.fillStyle = f.color;
     f.bars.forEach((bar, i) => {
-      const pos = i / total;
-      const alpha = fadeIn ? clamp01(1 - (pos - phase) / FADE_ZONE) : clamp01((pos - phase) / FADE_ZONE);
-      if (alpha <= 0) return;
+      const alpha = ramp(level, i / total, FADE_ZONE);
       if (alpha >= 1) {
         solid.push(bar);
-        return;
+      } else if (alpha > 0 && f.imgMask) {
+        drawInBar(ctx, bar, f.nextImage, f.width, f.height, f.fit, alpha);
+      } else if (alpha > 0) {
+        ctx.globalAlpha = alpha;
+        ctx.fillRect(bar.x, bar.y, bar.width, bar.height);
       }
-      ctx.globalAlpha = alpha;
-      ctx.fillRect(bar.x, bar.y, bar.width, bar.height);
     });
     ctx.globalAlpha = 1;
-    fillBars(ctx, solid, f.color);
+    // Fully shown bars share one path, so they meet without seams.
+    if (f.imgMask) clipDraw(ctx, solid, f.nextImage, f.width, f.height, f.fit);
+    else fillBars(ctx, solid, f.color);
   },
 };

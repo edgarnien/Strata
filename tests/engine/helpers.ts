@@ -43,12 +43,15 @@ export function testBars(cols = 10, rows = 10, w = 10, h = 30): Bar[] {
   return bars;
 }
 
+/** A frame input; unless `lead` is given, every bar belongs to the look. */
 export function frame(over: Partial<FrameInput> = {}): FrameInput {
+  const bars = over.bars ?? testBars();
   return {
     width: 100,
     height: 300,
     fit: 'cover',
-    bars: testBars(),
+    bars,
+    lead: bars.length,
     progress: 0.5,
     cycle: 0,
     frameIndex: 0,
@@ -74,30 +77,42 @@ export const TEST_SETTINGS: Settings = {
   imgMask: false, motion: 'buildUp', speed: 1, loops: 1, format: '9:16',
 };
 
+export const barKey = (bar: Bar): string => `${bar.x},${bar.y}`;
+
 /**
- * Share of `bars` a motion covers: stroke fills, plus next-image draws clipped to bars; draws of
- * the current image (REVEAL clearing a bar) count against it.
+ * How much of each bar (keyed by barKey) a motion covers: stroke fills, plus next-image draws
+ * clipped to bars; draws of the current image (REVEAL clearing a bar) count against it.
  */
-export function coverage(draw: (ctx: Ctx2D) => void, bars: number): number {
-  let pending = 0;
-  let clipped = 0;
-  let covered = 0;
+export function coverageByBar(draw: (ctx: Ctx2D) => void): Map<string, number> {
+  let pending: string[] = [];
+  let clipped: string[] = [];
+  const covered = new Map<string, number>();
+  const add = (keys: string[], v: number) => {
+    for (const k of keys) covered.set(k, (covered.get(k) ?? 0) + v);
+  };
   const ctx = {
     globalAlpha: 1,
     fillStyle: '',
     save() {},
     restore() { ctx.globalAlpha = 1; },
     clearRect() {},
-    beginPath() { pending = 0; },
-    rect() { pending++; },
+    beginPath() { pending = []; },
+    rect(x: number, y: number) { pending.push(`${x},${y}`); },
     clip() { clipped = pending; },
-    fill() { covered += pending * ctx.globalAlpha; },
-    fillRect() { covered += ctx.globalAlpha; },
+    fill() { add(pending, ctx.globalAlpha); },
+    fillRect(x: number, y: number) { add([`${x},${y}`], ctx.globalAlpha); },
     drawImage(img: { id: string }) {
-      covered += (img.id === 'cur' ? -clipped : clipped) * ctx.globalAlpha;
-      clipped = 0;
+      add(clipped, (img.id === 'cur' ? -1 : 1) * ctx.globalAlpha);
+      clipped = [];
     },
   };
   draw(ctx as unknown as Ctx2D);
-  return covered / bars;
+  return covered;
+}
+
+/** Share of `bars` a motion covers (see coverageByBar). */
+export function coverage(draw: (ctx: Ctx2D) => void, bars: number): number {
+  let sum = 0;
+  for (const v of coverageByBar(draw).values()) sum += v;
+  return sum / bars;
 }
