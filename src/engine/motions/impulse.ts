@@ -26,7 +26,7 @@ export const impulse: Motion = {
     // A bar is hit by the wave that reaches it first; later waves start as if from further away.
     const arrival = (bar: Bar) =>
       barNoise(bar) * scatter + Math.min(...origins.map((o) => Math.hypot(bar.x - o.x, bar.y - o.y) + o.delay * maxR));
-    const visible = earliest(f.bars, paceLevel(f.progress, f.imgMask), arrival, f.lead, f.rim);
+    const visible = earliest(f.bars, paceLevel(f.progress, f.imgMask), arrival, f.lead);
     if (f.imgMask) clipDraw(ctx, visible, f.nextImage, f.width, f.height, f.fit);
     else fillBars(ctx, visible, f.color);
   },
