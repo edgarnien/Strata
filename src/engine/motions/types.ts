@@ -1,4 +1,4 @@
-import type { Bar, Ctx2D, Fit, MotionId } from '../types';
+import type { Bar, Ctx2D, Fit, MotionId, Picture } from '../types';
 
 export interface FrameInput {
   width: number;
@@ -15,8 +15,8 @@ export interface FrameInput {
   frameIndex: number;
   seed: number;
   color: string;
-  image: ImageBitmap;
-  nextImage: ImageBitmap;
+  image: Picture;
+  nextImage: Picture;
   imgMask: boolean;
 }
 

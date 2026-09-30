@@ -1,4 +1,4 @@
-import { FORMAT_IDS, MOTION_IDS, type Settings } from '../engine/types';
+import { FORMAT_IDS, MOTION_IDS, MOVE_IDS, type Settings } from '../engine/types';
 import { normalizeHex } from '../util/color';
 
 export const STORAGE_KEY = 'strata:v2';
@@ -15,6 +15,8 @@ export const DEFAULT_SETTINGS: Settings = {
   speed: 1,
   loops: 2,
   format: '9:16',
+  move: 'off',
+  moveStrokes: false,
 };
 
 export type RangeKey = 'size' | 'stretch' | 'threshold' | 'sensitivity' | 'speed' | 'loops';
@@ -37,7 +39,7 @@ export function parseSettings(raw: unknown): Settings {
     if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max) return d[key];
     return Math.round(v / step) * step;
   };
-  const bool = (key: 'removeFront' | 'imgMask'): boolean => (typeof r[key] === 'boolean' ? (r[key] as boolean) : d[key]);
+  const bool = (key: 'removeFront' | 'imgMask' | 'moveStrokes'): boolean => (typeof r[key] === 'boolean' ? (r[key] as boolean) : d[key]);
   const oneOf = <T extends string>(v: unknown, options: readonly T[], fallback: T): T =>
     (options as readonly unknown[]).includes(v) ? (v as T) : fallback;
 
@@ -53,6 +55,8 @@ export function parseSettings(raw: unknown): Settings {
     speed: ranged('speed'),
     loops: ranged('loops'),
     format: oneOf(r.format, FORMAT_IDS, d.format),
+    move: oneOf(r.move, MOVE_IDS, d.move),
+    moveStrokes: bool('moveStrokes'),
   };
 }
 

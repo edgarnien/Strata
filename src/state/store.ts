@@ -13,7 +13,7 @@ export interface ImageEntry {
 
 export type ToolId =
   | 'size' | 'stretch' | 'threshold' | 'remove' | 'color' | 'imgMask'
-  | 'motion' | 'speed' | 'loops' | 'format';
+  | 'motion' | 'move' | 'speed' | 'loops' | 'format';
 
 export const settings = signal<Settings>(loadSettings());
 export const images = signal<readonly ImageEntry[]>([]);

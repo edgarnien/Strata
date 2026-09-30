@@ -1,8 +1,8 @@
-import type { Bar, Ctx2D, Fit } from './types';
+import type { Bar, Ctx2D, Fit, Picture } from './types';
 
 export const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 
-export function drawFitted(ctx: Ctx2D, img: ImageBitmap, width: number, height: number, fit: Fit): void {
+export function drawFitted(ctx: Ctx2D, img: Picture, width: number, height: number, fit: Fit): void {
   if (fit === 'contain') {
     const scale = Math.min(width / img.width, height / img.height);
     const w = img.width * scale;
@@ -39,7 +39,7 @@ export function fillBars(ctx: Ctx2D, bars: readonly Bar[], color: string, count 
 }
 
 /** Draws `img` only inside the union of `bars` (IMG MASK reveal). */
-export function clipDraw(ctx: Ctx2D, bars: readonly Bar[], img: ImageBitmap, width: number, height: number, fit: Fit): void {
+export function clipDraw(ctx: Ctx2D, bars: readonly Bar[], img: Picture, width: number, height: number, fit: Fit): void {
   if (bars.length === 0) return;
   ctx.save();
   ctx.beginPath();
@@ -50,7 +50,7 @@ export function clipDraw(ctx: Ctx2D, bars: readonly Bar[], img: ImageBitmap, wid
 }
 
 /** Draws `img` inside one bar at the given opacity. */
-export function drawInBar(ctx: Ctx2D, bar: Bar, img: ImageBitmap, width: number, height: number, fit: Fit, alpha: number): void {
+export function drawInBar(ctx: Ctx2D, bar: Bar, img: Picture, width: number, height: number, fit: Fit, alpha: number): void {
   ctx.save();
   ctx.beginPath();
   ctx.rect(bar.x, bar.y, bar.width, bar.height);

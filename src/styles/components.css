@@ -226,11 +226,11 @@
 /* ---------- sidebar ---------- */
 /*
  * Denser than the mobile panel (no touch targets to keep) so everything fits without scrolling.
- * --air adds breathing room as the window gets taller: none up to 690px, 14px from ~970px. The
+ * --air adds breathing room as the window gets taller: none up to 730px, 14px from ~1010px. The
  * spacing grows slower than the window, so the sidebar never starts to scroll on the way up.
  */
 .sidebar {
-  --air: clamp(0px, (100dvh - 690px) / 20, 14px);
+  --air: clamp(0px, (100dvh - 730px) / 20, 14px);
 
   & .field { gap: calc(6px + var(--air) * .25); }
   & .range { height: 18px; }
@@ -246,6 +246,19 @@
   border-top: 1px solid var(--line);
 }
 .sidebar__export { flex: none; width: 100%; margin-top: auto; }
+/* MOTION and MOVE share a row; PICTURE | STROKES (only while something moves) runs underneath. */
+.sidebar .group--motion {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 8px;
+
+  & > * { grid-column: 1 / -1; }
+  & > [data-tool="motion"] { grid-column: 1; }
+  & > [data-tool="move"] { display: contents; }
+  & > [data-tool="move"] > .field { grid-column: 2; grid-row: 1; }
+  & > [data-tool="move"] > .segmented { grid-column: 1 / -1; }
+  & > [data-tool="move"] .segmented .btn { min-height: 28px; height: 28px; font-size: 10px; }
+}
 
 /* ---------- transport ---------- */
 .transport {

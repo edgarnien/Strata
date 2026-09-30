@@ -20,6 +20,8 @@ export class RecordingCtx {
   beginPath(): void { this.calls.push('beginPath'); }
   rect(x: number, y: number, w: number, h: number): void { this.calls.push(`rect ${x} ${y} ${w} ${h}`); }
   clip(): void { this.calls.push('clip'); }
+  translate(x: number, y: number): void { this.calls.push(`translate ${x.toFixed(2)} ${y.toFixed(2)}`); }
+  scale(x: number, y: number): void { this.calls.push(`scale ${x.toFixed(3)} ${y.toFixed(3)}`); }
   fill(): void { this.calls.push(`fill ${this.fillStyle} ${this.globalAlpha.toFixed(3)}`); }
   clearRect(x: number, y: number, w: number, h: number): void { this.calls.push(`clearRect ${x} ${y} ${w} ${h}`); }
   fillRect(x: number, y: number, w: number, h: number): void {
@@ -74,7 +76,7 @@ export const count = (calls: string[], prefix: string) => calls.filter((c) => c.
 
 export const TEST_SETTINGS: Settings = {
   size: 80, stretch: 0, threshold: 35, removeFront: false, sensitivity: 50, color: '#FFFFFF',
-  imgMask: false, motion: 'buildUp', speed: 1, loops: 1, format: '9:16',
+  imgMask: false, motion: 'buildUp', speed: 1, loops: 1, format: '9:16', move: 'off', moveStrokes: false,
 };
 
 export const barKey = (bar: Bar): string => `${bar.x},${bar.y}`;

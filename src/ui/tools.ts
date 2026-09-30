@@ -1,6 +1,6 @@
 import { colorLocked, images, type ToolId } from '../state/store';
 import {
-  colorControl, formatControl, imgMaskControl, loopsControl, motionControl, removeControl, sliderControl,
+  colorControl, formatControl, imgMaskControl, loopsControl, motionControl, moveControl, removeControl, sliderControl,
 } from './controls';
 
 export type GroupId = 'adjust' | 'background' | 'color' | 'motion' | 'format';
@@ -26,6 +26,7 @@ export const TOOLS: readonly ToolDef[] = [
   { id: 'color', label: 'Color', icon: '●', group: 'color', build: colorControl, locked: colorLocked },
   { id: 'imgMask', label: 'Img Mask', icon: '◧', group: 'color', build: imgMaskControl, visible: () => images.get().length >= 2 },
   { id: 'motion', label: 'Motion', icon: '∿', group: 'motion', build: motionControl },
+  { id: 'move', label: 'Move', icon: '⧉', group: 'motion', build: moveControl },
   { id: 'speed', label: 'Speed', icon: '»', group: 'motion', build: () => sliderControl({ label: 'SPEED', key: 'speed', readout: (v) => `${v.toFixed(1)}×` }) },
   { id: 'loops', label: 'Loops', icon: '⟳', group: 'motion', build: loopsControl },
   { id: 'format', label: 'Format', icon: '▯', group: 'format', build: formatControl },

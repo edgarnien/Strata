@@ -50,3 +50,10 @@ describe('load / save', () => {
     expect(loadSettings({ getItem: (k: string) => (k === 'pixelToolSettings' ? '{"aspectRatio":"original"}' : null) }).format).toBe('9:16');
   });
 });
+
+describe('MOVE settings', () => {
+  it('keeps a valid move and falls back to OFF / whole picture otherwise', () => {
+    expect(parseSettings({ move: 'depth', moveStrokes: true })).toMatchObject({ move: 'depth', moveStrokes: true });
+    expect(parseSettings({ move: 'spin', moveStrokes: 'yes' })).toMatchObject({ move: 'off', moveStrokes: false });
+  });
+});

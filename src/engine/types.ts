@@ -9,6 +9,13 @@ export type FormatId = (typeof FORMAT_IDS)[number];
 export const MOTION_IDS = ['buildUp', 'impulse', 'wave', 'fade', 'glitch', 'reveal'] as const;
 export type MotionId = (typeof MOTION_IDS)[number];
 
+/** Movement on top of the transition: none, the clip moving back into the frame, or sliding left. */
+export const MOVE_IDS = ['off', 'depth', 'slide'] as const;
+export type MoveId = (typeof MOVE_IDS)[number];
+
+/** Anything the transitions draw from: a clip, or a plain colour swatch. */
+export type Picture = ImageBitmap | OffscreenCanvas;
+
 export interface Size {
   width: number;
   height: number;
@@ -34,4 +41,7 @@ export interface Settings {
   speed: number;
   loops: number;
   format: FormatId;
+  move: MoveId;
+  /** MOVE shifts only the stroke layer and leaves the photo still (readable text). */
+  moveStrokes: boolean;
 }
