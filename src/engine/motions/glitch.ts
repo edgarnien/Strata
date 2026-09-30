@@ -13,7 +13,7 @@ export const glitch: Motion = {
   icon: '▦',
   covered: 'middle',
   draw(ctx, f) {
-    const order = shuffledInTiers(f.bars, f.lead, rngFor(f.seed, f.cycle, SALT));
+    const order = shuffledInTiers(f.bars, f.lead, rngFor(f.seed, f.cycle, SALT), f.rim);
     const flicker = rngFor(f.seed, f.cycle, f.frameIndex, SALT);
     const total = order.length;
     if (total === 0) return;

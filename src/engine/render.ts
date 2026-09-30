@@ -30,15 +30,20 @@ interface BarOrder {
   key: string;
   bars: Bar[];
   lead: number;
+  rim: number;
 }
+
+/** Bars whose centre lies in the outer fifth of the frame (towards any side) form its edge. */
+const RIM = 0.8;
 const orderCache = new WeakMap<ImageLayer, BarOrder>();
 
 /**
  * Bar order for one clip, identical for every loop so loops repeat exactly: its look (the stroke
- * bars) first and, with `whole`, the rest of the grid after it.
+ * bars) first and, with `whole`, the rest of the grid after it. With `edgesLast` (MOVE) the bars at
+ * the edge of the frame go to the very end, so the strokes grow from the inside out.
  */
-function barOrder(layer: ImageLayer, whole: boolean, seed: number, imageIndex: number): BarOrder {
-  const key = `${seed}:${imageIndex}:${whole}`;
+function barOrder(layer: ImageLayer, whole: boolean, seed: number, imageIndex: number, edgesLast = false): BarOrder {
+  const key = `${seed}:${imageIndex}:${whole}:${edgesLast}`;
   const hit = orderCache.get(layer);
   if (hit?.key === key) return hit;
   const look = shuffled(layer.strokeBars, mulberry32(hashSeed(seed, imageIndex, ORDER_SALT)));
@@ -48,7 +53,20 @@ function barOrder(layer: ImageLayer, whole: boolean, seed: number, imageIndex: n
     const rest = layer.gridBars.filter((b) => !inLook.has(`${b.x},${b.y}`));
     bars = [...look, ...shuffled(rest, mulberry32(hashSeed(seed, imageIndex, REST_SALT)))];
   }
-  const order = { key, bars, lead: look.length };
+  let lead = look.length;
+  let rim = 0;
+  if (edgesLast) {
+    const w = Math.max(...layer.gridBars.map((b) => b.x + b.width));
+    const h = Math.max(...layer.gridBars.map((b) => b.y + b.height));
+    const onRim = (b: Bar) =>
+      Math.max(Math.abs(b.x + b.width / 2 - w / 2) / (w / 2), Math.abs(b.y + b.height / 2 - h / 2) / (h / 2)) > RIM;
+    const inner = bars.filter((b) => !onRim(b));
+    const edge = bars.filter(onRim);
+    lead = look.filter((b) => !onRim(b)).length;
+    rim = edge.length;
+    bars = [...inner, ...edge];
+  }
+  const order = { key, bars, lead, rim };
   orderCache.set(layer, order);
   return order;
 }
@@ -94,7 +112,7 @@ export function renderFrame(ctx: Ctx2D, scene: Scene, t: number): number {
   const handover = chain && !imgMask && motion.covered === 'middle' && pos.progress >= 0.5;
   const index = handover ? pos.nextImageIndex : pos.imageIndex;
   const clip = scene.layers[index];
-  const order = barOrder(clip, chain, scene.seed, index);
+  const order = barOrder(clip, chain, scene.seed, index, s.move !== 'off');
 
   paintBase(ctx, scene, clip.bitmap);
   const strokes = s.move === 'off' ? ctx : movedStrokes(ctx, scene, motion, pos.progress, imgMask);
@@ -104,6 +122,7 @@ export function renderFrame(ctx: Ctx2D, scene: Scene, t: number): number {
     fit: scene.fit,
     bars: order.bars,
     lead: order.lead,
+    rim: order.rim,
     progress: pos.progress,
     cycle: pos.cycle,
     frameIndex: pos.frameIndex,
@@ -144,9 +163,9 @@ function renderTravel(ctx: Ctx2D, scene: Scene, pos: FramePosition, motion: Moti
 
   ctx.save();
   ctx.translate(depth ? 0 : SLIDE_SHIFT * w * (1 - ease(p)), 0);
-  const order = barOrder(next, true, scene.seed, pos.nextImageIndex);
+  const order = barOrder(next, true, scene.seed, pos.nextImageIndex, true);
   const front = {
-    width: w, height: h, fit, bars: order.bars, lead: order.lead, cycle: pos.cycle,
+    width: w, height: h, fit, bars: order.bars, lead: order.lead, rim: order.rim, cycle: pos.cycle,
     frameIndex: pos.frameIndex, seed: scene.seed, color: s.color, image: next.bitmap, imgMask: true,
   };
   if (!imgMask) motion.draw(ctx, { ...front, progress: accentProgress(p), nextImage: swatch(s.color, w, h) });

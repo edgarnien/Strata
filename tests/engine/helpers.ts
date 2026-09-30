@@ -54,6 +54,7 @@ export function frame(over: Partial<FrameInput> = {}): FrameInput {
     fit: 'cover',
     bars,
     lead: bars.length,
+    rim: 0,
     progress: 0.5,
     cycle: 0,
     frameIndex: 0,

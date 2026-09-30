@@ -17,17 +17,25 @@ export function ramp(level: number, pos: number, width: number): number {
   return clamp01((level * (1 + width) - pos) / width);
 }
 
-/** The `level` share of the bars that `arrival` says are reached first; the look (first `lead`) before the rest. */
-export function earliest(bars: readonly Bar[], level: number, arrival: (bar: Bar) => number, lead = bars.length): Bar[] {
-  const count = Math.floor(level * bars.length);
-  if (count <= 0) return [];
-  const byArrival = (list: readonly Bar[]) =>
-    list.map((bar) => ({ bar, at: arrival(bar) })).sort((a, b) => a.at - b.at).map((b) => b.bar);
-  const look = byArrival(bars.slice(0, lead));
-  return (count <= lead ? look : [...look, ...byArrival(bars.slice(lead))]).slice(0, count);
+/** The bar order in tiers that keep their turn: the look (first `lead`), the rest, the edge (last `rim`). */
+function tiers(bars: readonly Bar[], lead: number, rim: number): Bar[][] {
+  const edge = bars.length - rim;
+  return [bars.slice(0, Math.min(lead, edge)), bars.slice(Math.min(lead, edge), edge), bars.slice(edge)];
 }
 
-/** Shuffles the look (first `lead` bars) and the rest separately, so the look stays first. */
-export function shuffledInTiers(bars: readonly Bar[], lead: number, rng: () => number): Bar[] {
-  return [...shuffled(bars.slice(0, lead), rng), ...shuffled(bars.slice(lead), rng)];
+/** The `level` share of the bars that `arrival` says are reached first, tier by tier. */
+export function earliest(bars: readonly Bar[], level: number, arrival: (bar: Bar) => number, lead = bars.length, rim = 0): Bar[] {
+  const count = Math.floor(level * bars.length);
+  if (count <= 0) return [];
+  const out: Bar[] = [];
+  for (const tier of tiers(bars, lead, rim)) {
+    if (out.length >= count) break;
+    out.push(...tier.map((bar) => ({ bar, at: arrival(bar) })).sort((a, b) => a.at - b.at).map((b) => b.bar));
+  }
+  return out.slice(0, count);
+}
+
+/** Shuffles each tier on its own, so the look stays first and the edge last. */
+export function shuffledInTiers(bars: readonly Bar[], lead: number, rng: () => number, rim = 0): Bar[] {
+  return tiers(bars, lead, rim).flatMap((tier) => shuffled(tier, rng));
 }

@@ -10,6 +10,8 @@ export interface FrameInput {
    */
   bars: readonly Bar[];
   lead: number;
+  /** The last `rim` bars sit at the edge of the frame; with MOVE they come last so nothing builds up like a wall. */
+  rim: number;
   progress: number;
   cycle: number;
   frameIndex: number;

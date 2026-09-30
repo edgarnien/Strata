@@ -69,7 +69,8 @@ describe('MOVE DEPTH, strokes only', () => {
   it('keeps the photo still and moves the strokes, which sit in place at their peak', () => {
     const strokesOnly = scene({ move: 'depth', moveStrokes: true }, ['a']);
     const still = scene({}, ['a']);
-    expect(record((ctx) => renderFrame(ctx, strokesOnly, 3))).toEqual(record((ctx) => renderFrame(ctx, still, 3)));
+    const sorted = (calls: string[]) => [...calls].sort();
+    expect(sorted(record((ctx) => renderFrame(ctx, strokesOnly, 3)))).toEqual(sorted(record((ctx) => renderFrame(ctx, still, 3))));
     const rising = record((ctx) => renderFrame(ctx, strokesOnly, 1.5));
     expect(rising).not.toEqual(record((ctx) => renderFrame(ctx, still, 1.5)));
     expect(count(rising, 'scale ')).toBe(0);
@@ -84,4 +85,23 @@ describe('MOVE SLIDE, whole picture', () => {
     const end = record((ctx) => renderFrame(ctx, sc, 6 - 1e-4));
     expect(end.filter((c) => c.startsWith('translate')).at(-1)).toBe('translate 0.00 0.00');
   });
+});
+
+describe('MOVE builds from the inside out', () => {
+  // Test grid: 10 × 10 bars of 10 × 30 in a 100 × 300 frame; the outer ring is columns / rows 0 and 9.
+  // SLIDE with strokes only shifts the outlines sideways, so there only the top and bottom rows count.
+  const onRim = (c: string, rowsOnly: boolean) => {
+    const [, x, y] = c.split(' ').map(Number);
+    return y === 0 || y === 270 || (!rowsOnly && (x === 0 || x === 90));
+  };
+  for (const [move, moveStrokes] of [['depth', false], ['slide', false], ['slide', true]] as const) {
+    it(`${move}${moveStrokes ? ' (strokes)' : ''} leaves the edge of the frame for the end`, () => {
+      const sc = scene({ move, moveStrokes });
+      const middle = record((ctx) => renderFrame(ctx, sc, moveStrokes ? 1.5 : 3)).filter((c) => c.startsWith('rect '));
+      expect(middle.length).toBeGreaterThan(20);
+      expect(middle.filter((c) => onRim(c, moveStrokes))).toEqual([]);
+      const end = record((ctx) => renderFrame(ctx, sc, moveStrokes ? 2.99 : 5.99)).filter((c) => c.startsWith('rect '));
+      expect(end.filter((c) => onRim(c, moveStrokes)).length).toBeGreaterThan(moveStrokes ? 8 : 20);
+    });
+  }
 });
