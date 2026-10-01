@@ -24,7 +24,7 @@ describe('ease', () => {
 });
 
 it('offers the stroke moves', () => {
-  expect(MOVE_IDS).toEqual(['off', 'depth', 'slide', 'scatter', 'lines', 'sway']);
+  expect(MOVE_IDS).toEqual(['off', 'depth', 'slide', 'sway']);
 });
 
 for (const move of MOVE_IDS.filter((m) => m !== 'off')) {

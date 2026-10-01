@@ -4,8 +4,6 @@ export const MOVES: readonly { id: MoveId; icon: string; label: string }[] = [
   { id: 'off', icon: '·', label: 'OFF' },
   { id: 'depth', icon: '⧉', label: 'DEPTH' },
   { id: 'slide', icon: '⇠', label: 'SLIDE' },
-  { id: 'scatter', icon: '⁘', label: 'SCATTER' },
-  { id: 'lines', icon: '⋮', label: 'LINES' },
   { id: 'sway', icon: '≋', label: 'SWAY' },
 ];
 
@@ -13,10 +11,6 @@ export const MOVES: readonly { id: MoveId; icon: string; label: string }[] = [
 export const DEPTH_MIN = 0.6;
 /** How far (share of the frame width) the stroke layer travels while it slides (SLIDE). */
 export const SLIDE_SHIFT = 0.35;
-/** How far out the strokes start (SCATTER), as a share of their distance from the centre. */
-export const SCATTER_SPREAD = 0.6;
-/** How thin the strokes start (LINES), as a share of their width. */
-export const LINES_MIN = 0.12;
 /** How far the strokes sway sideways (SWAY), as a share of the frame width, and how many waves run down the frame. */
 export const SWAY_SHIFT = 0.18;
 export const SWAY_WAVES = 1.5;

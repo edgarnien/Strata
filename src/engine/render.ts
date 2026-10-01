@@ -1,7 +1,7 @@
 import { clipDraw, drawFitted, fillBars } from './draw';
 import { motionById, type Motion } from './motions';
 import { paceLevel } from './motions/pace';
-import { DEPTH_MIN, LINES_MIN, SCATTER_SPREAD, SLIDE_SHIFT, SWAY_SHIFT, SWAY_WAVES, ease } from './move';
+import { DEPTH_MIN, SLIDE_SHIFT, SWAY_SHIFT, SWAY_WAVES, ease } from './move';
 import { hashSeed, mulberry32, shuffled } from './rng';
 import { positionAt, totalDuration } from './timeline';
 import type { Bar, Ctx2D, Fit, Settings } from './types';
@@ -118,8 +118,7 @@ export function renderFrame(ctx: Ctx2D, scene: Scene, t: number): number {
 /**
  * MOVE: the strokes move as they build up and fall away, over a photo that stays still so text
  * stays readable. DEPTH brings the layer forward, SLIDE slides it in from the right and out to the
- * left, SCATTER gathers every bar in from further out, LINES widens thin lines into bars, SWAY
- * straightens a wavy sideways shift. It sits in place wherever the
+ * left, SWAY straightens a wavy sideways shift. It sits in place wherever the
  * strokes are complete, so the look and the hand-over between clips stay put.
  */
 function movedStrokes(ctx: Ctx2D, scene: Scene, motion: Motion, progress: number, imgMask: boolean): Ctx2D {
@@ -131,14 +130,6 @@ function movedStrokes(ctx: Ctx2D, scene: Scene, motion: Motion, progress: number
     case 'depth': {
       const k = 1 - (1 - DEPTH_MIN) * away;
       return placeRects(ctx, (x, y, bw, bh) => [w / 2 + (x - w / 2) * k, h / 2 + (y - h / 2) * k, bw * k, bh * k]);
-    }
-    case 'scatter': {
-      const k = SCATTER_SPREAD * away;
-      return placeRects(ctx, (x, y, bw, bh) => [x + (x + bw / 2 - w / 2) * k, y + (y + bh / 2 - h / 2) * k, bw, bh]);
-    }
-    case 'lines': {
-      const k = 1 - (1 - LINES_MIN) * away;
-      return placeRects(ctx, (x, y, bw, bh) => [x + (bw * (1 - k)) / 2, y, bw * k, bh]);
     }
     case 'sway': {
       const amp = SWAY_SHIFT * w * away;
