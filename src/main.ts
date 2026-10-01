@@ -2,6 +2,7 @@ import './styles/tokens.css';
 import './styles/layout.css';
 import './styles/components.css';
 import { makeTestImage } from './dev/testImage';
+import { loadTestVideos } from './dev/testVideos';
 import { exportVideo } from './export/video';
 import { effect } from './state/signal';
 import { exporting, hasContent, images, patchSettings, settings, videoClips } from './state/store';
@@ -72,5 +73,5 @@ effect([images, videoClips, settings, exporting], () => {
 if (import.meta.env.DEV) {
   const loadTestImage = async (accent?: string, width?: number, height?: number) =>
     addImageFiles([await makeTestImage(accent, width, height)]);
-  Object.assign(window, { __strata: { addImageFiles, addVideoFiles, buildScene, exportVideo, loadTestImage, patchSettings } });
+  Object.assign(window, { __strata: { addImageFiles, addVideoFiles, buildScene, exportVideo, loadTestImage, loadTestVideos, patchSettings } });
 }
