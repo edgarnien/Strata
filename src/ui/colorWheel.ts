@@ -1,7 +1,8 @@
 import { hexToHsv, hsvToHex, pickFromWheel, wheelPoint } from '../util/color';
 import { h } from './dom';
 
-const PRESETS = ['#FFFFFF', '#000000', '#FF3B30', '#FF9500', '#FFD60A', '#34C759', '#0A84FF', '#BF5AF2'];
+/** White, black and the HSBI colours (grey, sand, bronze, green, blue, red). */
+const PRESETS = ['#FFFFFF', '#000000', '#C8C8C8', '#D7D2C3', '#C8A591', '#9BAF87', '#6EAFC8', '#78232D'];
 
 /**
  * HSV wheel (hue around, saturation outwards from white), a brightness slider and quick swatches.

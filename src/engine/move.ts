@@ -5,6 +5,8 @@ export const MOVES: readonly { id: MoveId; icon: string; label: string }[] = [
   { id: 'depth', icon: '⧉', label: 'DEPTH' },
   { id: 'slide', icon: '⇠', label: 'SLIDE' },
   { id: 'sway', icon: '≋', label: 'SWAY' },
+  { id: 'offset', icon: '⇅', label: 'OFFSET' },
+  { id: 'step', icon: '⇤', label: 'STEP' },
 ];
 
 /** How far back the stroke layer starts (DEPTH): its scale before it comes forward. */
@@ -14,6 +16,13 @@ export const SLIDE_SHIFT = 0.35;
 /** How far the strokes sway sideways (SWAY), as a share of the frame width, and how many waves run down the frame. */
 export const SWAY_SHIFT = 0.18;
 export const SWAY_WAVES = 1.5;
+/** How many bar heights a column of strokes starts away from its place (OFFSET). */
+export const OFFSET_ROWS = 2;
+
+/** Stable per-column factor in [-1, 1]: how far, and which way, a column is offset (OFFSET). */
+export function columnOffset(column: number): number {
+  return ((Math.imul(column + 1, 73856093) >>> 0) % 1001) / 500 - 1;
+}
 
 /** 0 → 1 with a soft start and stop, so every move rests at both ends. */
 export function ease(t: number): number {

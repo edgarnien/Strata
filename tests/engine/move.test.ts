@@ -24,7 +24,7 @@ describe('ease', () => {
 });
 
 it('offers the stroke moves', () => {
-  expect(MOVE_IDS).toEqual(['off', 'depth', 'slide', 'sway']);
+  expect(MOVE_IDS).toEqual(['off', 'depth', 'slide', 'sway', 'offset', 'step']);
 });
 
 for (const move of MOVE_IDS.filter((m) => m !== 'off')) {
@@ -52,3 +52,31 @@ for (const move of MOVE_IDS.filter((m) => m !== 'off')) {
     });
   });
 }
+
+describe('OFFSET and STEP move in whole grid steps', () => {
+  // Test grid: bars of 10 × 30 – every outline must sit on that grid, at full size, in every frame.
+  for (const move of ['offset', 'step'] as const) {
+    it(`${move.toUpperCase()} keeps every bar on the grid, corner on corner`, () => {
+      let moved = false;
+      for (let t = 0.1; t < 6; t += 0.37) {
+        const still = record((ctx) => renderFrame(ctx, scene({}), t)).filter((c) => c.startsWith('rect '));
+        const rects = record((ctx) => renderFrame(ctx, scene({ move }), t)).filter((c) => c.startsWith('rect '));
+        for (const r of rects) {
+          const [, x, y, w, h] = r.split(' ').map(Number);
+          expect([Math.abs(x % 10), Math.abs(y % 30), w, h]).toEqual([0, 0, 10, 30]); // bars may sit beyond the frame
+        }
+        if ([...rects].sort().join() !== [...still].sort().join()) moved = true;
+      }
+      expect(moved).toBe(true);
+    });
+  }
+
+  it('OFFSET shifts whole columns up or down, STEP shifts the layer sideways', () => {
+    const at = (move: 'offset' | 'step') => record((ctx) => renderFrame(ctx, scene({ move }), 0.9)).filter((c) => c.startsWith('rect '));
+    const still = record((ctx) => renderFrame(ctx, scene({}), 0.9)).filter((c) => c.startsWith('rect '));
+    const xs = (rects: string[]) => rects.map((r) => r.split(' ')[1]).sort().join();
+    const ys = (rects: string[]) => rects.map((r) => r.split(' ')[2]).sort().join();
+    expect(xs(at('offset'))).toBe(xs(still));
+    expect(ys(at('step'))).toBe(ys(still));
+  });
+});

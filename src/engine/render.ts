@@ -1,7 +1,7 @@
 import { clipDraw, drawFitted, fillBars } from './draw';
 import { motionById, type Motion } from './motions';
 import { paceLevel } from './motions/pace';
-import { DEPTH_MIN, SLIDE_SHIFT, SWAY_SHIFT, SWAY_WAVES, ease } from './move';
+import { DEPTH_MIN, OFFSET_ROWS, SLIDE_SHIFT, SWAY_SHIFT, SWAY_WAVES, columnOffset, ease } from './move';
 import { hashSeed, mulberry32, shuffled } from './rng';
 import { positionAt, totalDuration } from './timeline';
 import type { Bar, Ctx2D, Fit, Settings } from './types';
@@ -96,7 +96,7 @@ export function renderFrame(ctx: Ctx2D, scene: Scene, t: number): number {
   const order = barOrder(clip, chain, scene.seed, index);
 
   paintBase(ctx, scene, clip.bitmap);
-  const strokes = s.move === 'off' ? ctx : movedStrokes(ctx, scene, motion, pos.progress, imgMask);
+  const strokes = s.move === 'off' ? ctx : movedStrokes(ctx, scene, motion, pos.progress, imgMask, clip.gridBars);
   motion.draw(strokes, {
     width: scene.width,
     height: scene.height,
@@ -118,10 +118,12 @@ export function renderFrame(ctx: Ctx2D, scene: Scene, t: number): number {
 /**
  * MOVE: the strokes move as they build up and fall away, over a photo that stays still so text
  * stays readable. DEPTH brings the layer forward, SLIDE slides it in from the right and out to the
- * left, SWAY straightens a wavy sideways shift. It sits in place wherever the
- * strokes are complete, so the look and the hand-over between clips stay put.
+ * left, SWAY straightens a wavy sideways shift. OFFSET and STEP move in whole grid steps – columns
+ * up or down by bar heights, the layer sideways by columns – so bars always meet corner on corner.
+ * Every move sits in place wherever the strokes are complete, so the look and the hand-over
+ * between clips stay put.
  */
-function movedStrokes(ctx: Ctx2D, scene: Scene, motion: Motion, progress: number, imgMask: boolean): Ctx2D {
+function movedStrokes(ctx: Ctx2D, scene: Scene, motion: Motion, progress: number, imgMask: boolean, grid: Bar[]): Ctx2D {
   const { width: w, height: h } = scene;
   const level = paceLevel(progress, imgMask);
   const startsCovered = !imgMask && motion.covered === 'ends';
@@ -130,6 +132,26 @@ function movedStrokes(ctx: Ctx2D, scene: Scene, motion: Motion, progress: number
     case 'depth': {
       const k = 1 - (1 - DEPTH_MIN) * away;
       return placeRects(ctx, (x, y, bw, bh) => [w / 2 + (x - w / 2) * k, h / 2 + (y - h / 2) * k, bw * k, bh * k]);
+    }
+    case 'offset': {
+      const g = gridEdges(grid, w, h);
+      return placeRects(ctx, (x, y, bw, bh) => {
+        const c = g.col.get(x);
+        const r = g.row.get(y);
+        if (c === undefined || r === undefined) return [x, y, bw, bh];
+        const top = r + Math.round(away * OFFSET_ROWS * columnOffset(c));
+        return [x, edge(g.ys, top), bw, edge(g.ys, top + 1) - edge(g.ys, top)];
+      });
+    }
+    case 'step': {
+      const g = gridEdges(grid, w, h);
+      const building = imgMask || (startsCovered ? progress >= 0.5 : progress < 0.5);
+      const shift = (building ? 1 : -1) * Math.round(away * Math.max(1, Math.round(SLIDE_SHIFT * (g.xs.length - 1))));
+      return placeRects(ctx, (x, y, bw, bh) => {
+        const c = g.col.get(x);
+        if (c === undefined) return [x, y, bw, bh];
+        return [edge(g.xs, c + shift), y, edge(g.xs, c + shift + 1) - edge(g.xs, c + shift), bh];
+      });
     }
     case 'sway': {
       const amp = SWAY_SHIFT * w * away;
@@ -144,6 +166,34 @@ function movedStrokes(ctx: Ctx2D, scene: Scene, motion: Motion, progress: number
 }
 
 type Rect = [number, number, number, number];
+
+interface GridEdges {
+  /** Column and row edges, ending with the frame's width / height. */
+  xs: number[];
+  ys: number[];
+  col: Map<number, number>;
+  row: Map<number, number>;
+}
+const edgesCache = new WeakMap<Bar[], GridEdges>();
+
+/** Where the grid's columns and rows start, so bars can move by whole cells. */
+function gridEdges(grid: Bar[], w: number, h: number): GridEdges {
+  const hit = edgesCache.get(grid);
+  if (hit) return hit;
+  const xs = [...new Set(grid.map((b) => b.x))].sort((a, b) => a - b).concat(w);
+  const ys = [...new Set(grid.map((b) => b.y))].sort((a, b) => a - b).concat(h);
+  const g = { xs, ys, col: new Map(xs.map((x, i) => [x, i])), row: new Map(ys.map((y, i) => [y, i])) };
+  edgesCache.set(grid, g);
+  return g;
+}
+
+/** Edge `i` of a grid axis; beyond the frame the cells repeat at their average size. */
+function edge(edges: number[], i: number): number {
+  const last = edges.length - 1;
+  if (i < 0) return (i * edges[last]) / last;
+  if (i > last) return edges[last] + ((i - last) * edges[last]) / last;
+  return edges[i];
+}
 
 /** The context with every bar outline moved by `place`; images still draw where they are. */
 function placeRects(ctx: Ctx2D, place: (...r: Rect) => Rect): Ctx2D {
