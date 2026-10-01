@@ -21,6 +21,16 @@ export class EncodeCancelled extends Error {}
 const AUDIO_SHARE = 0.1;
 const NO_SOUND_NOTE = "Exported without sound – this browser can't encode audio.";
 
+/** Runs a decode step; a failure is reported with the clip's name (cancellation passes through). */
+async function decoding<T>(name: string, step: () => Promise<T>): Promise<T> {
+  try {
+    return await step();
+  } catch (err) {
+    if (err instanceof EncodeCancelled) throw err;
+    throw new Error(`${name} could not be decoded: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 /** Video mode export: decode every clip frame-exact, draw the stroke phases, mix the sound. */
 export async function encodeProject(scene: VideoProjectScene, clips: ClipFile[], fps: number, hooks: EncodeHooks): Promise<void> {
   const { width, height } = scene;
@@ -78,22 +88,20 @@ export async function encodeProject(scene: VideoProjectScene, clips: ClipFile[],
     }
     for (const [key, list] of times) {
       const clipId = key.slice(0, key.lastIndexOf(':'));
-      const track = await inputs.get(clipId)?.getPrimaryVideoTrack();
-      if (!track) throw new Error(`${names.get(clipId) ?? clipId} has no video track`);
-      streams.set(key, new CanvasSink(track, { width, height, fit: scene.fit, poolSize: 2 }).canvasesAtTimestamps(list));
+      const name = names.get(clipId) ?? clipId;
+      await decoding(name, async () => {
+        const track = await inputs.get(clipId)?.getPrimaryVideoTrack();
+        if (!track) throw new Error('it has no video track');
+        streams.set(key, new CanvasSink(track, { width, height, fit: scene.fit, poolSize: 2 }).canvasesAtTimestamps(list));
+      });
     }
     const last = new Map<string, HTMLCanvasElement | OffscreenCanvas>();
     const blank = new OffscreenCanvas(width, height);
     const nextCanvas = async (key: string) => {
       const stream = streams.get(key);
       if (!stream) throw new Error(`No decoder for ${key}`);
-      let r: IteratorResult<WrappedCanvas | null, void>;
-      try {
-        r = await stream.next();
-      } catch (err) {
-        const clipId = key.slice(0, key.lastIndexOf(':'));
-        throw new Error(`${names.get(clipId) ?? clipId} could not be decoded: ${err instanceof Error ? err.message : String(err)}`);
-      }
+      const clipId = key.slice(0, key.lastIndexOf(':'));
+      const r = await decoding(names.get(clipId) ?? clipId, () => stream.next());
       // Before a clip's first frame there is none yet: keep the previous picture (or black).
       const canvasOut = r.done || !r.value ? (last.get(key) ?? blank) : r.value.canvas;
       last.set(key, canvasOut);
@@ -127,26 +135,29 @@ export async function encodeProject(scene: VideoProjectScene, clips: ClipFile[],
 /** Decodes each shot's sound and lays it into one 48 kHz stereo mix at its output time. */
 async function mixSound(scene: VideoProjectScene, clips: ClipFile[], inputs: Map<string, Input>, hooks: EncodeHooks): Promise<Stereo> {
   const lay = scene.layout;
+  const names = new Map(clips.map((c) => [c.id, c.name]));
   const mix = createMix(lay.duration);
   const withSound = new Set(clips.filter((c) => c.hasAudio).map((c) => c.id));
   for (const [i, shot] of lay.shots.entries()) {
     if (!withSound.has(shot.clipId)) continue;
-    const track = await inputs.get(shot.clipId)?.getPrimaryAudioTrack();
-    if (!track) continue;
-    for await (const sample of new AudioSampleSink(track).samples(shot.sourceStart, shot.sourceEnd)) {
-      if (hooks.isCancelled()) {
-        sample.close();
-        throw new EncodeCancelled();
+    await decoding(names.get(shot.clipId) ?? shot.clipId, async () => {
+      const track = await inputs.get(shot.clipId)?.getPrimaryAudioTrack();
+      if (!track) return;
+      for await (const sample of new AudioSampleSink(track).samples(shot.sourceStart, shot.sourceEnd)) {
+        try {
+          if (hooks.isCancelled()) throw new EncodeCancelled();
+          const planes: Float32Array[] = [];
+          for (let ch = 0; ch < sample.numberOfChannels; ch++) {
+            const plane = new Float32Array(sample.numberOfFrames);
+            sample.copyTo(plane, { planeIndex: ch, format: 'f32-planar' });
+            planes.push(resample(plane, sample.sampleRate, MIX_RATE));
+          }
+          addInto(mix, toStereo(planes), shot.start + (sample.timestamp - shot.sourceStart), (t) => shotGain(lay, i, t));
+        } finally {
+          sample.close();
+        }
       }
-      const planes: Float32Array[] = [];
-      for (let ch = 0; ch < sample.numberOfChannels; ch++) {
-        const plane = new Float32Array(sample.numberOfFrames);
-        sample.copyTo(plane, { planeIndex: ch, format: 'f32-planar' });
-        planes.push(resample(plane, sample.sampleRate, MIX_RATE));
-      }
-      addInto(mix, toStereo(planes), shot.start + (sample.timestamp - shot.sourceStart), (t) => shotGain(lay, i, t));
-      sample.close();
-    }
+    });
     hooks.post({ type: 'progress', value: (AUDIO_SHARE * (i + 1)) / lay.shots.length });
   }
   return mix;
