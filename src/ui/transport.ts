@@ -1,8 +1,10 @@
 import { motionById } from '../engine/motions';
 import { randomSeed } from '../engine/rng';
 import { totalDuration } from '../engine/timeline';
+import { layout } from '../engine/videoTimeline';
 import { effect } from '../state/signal';
-import { activeTool, images, playing, seed, settings } from '../state/store';
+import { activeTool, hasContent, images, markers, playhead, playing, seed, settings, timelineInput, videoClips } from '../state/store';
+import { formatClock } from '../util/time';
 import { h } from './dom';
 
 export function mountTransport(root: HTMLElement): void {
@@ -32,12 +34,20 @@ export function mountTransport(root: HTMLElement): void {
     play.textContent = on ? '❚❚' : '▶';
     play.setAttribute('aria-label', on ? 'Pause' : 'Play');
   });
-  effect([settings, images], () => {
+  const showInfo = () => {
     const s = settings.get();
-    const m = motionById(s.motion);
+    if (s.mode === 'video') {
+      info.textContent = `${formatClock(playhead.get())} / ${formatClock(layout(timelineInput(s)).duration)}`;
+      return;
+    }
     const count = images.get().length;
-    root.hidden = count === 0;
-    motion.textContent = `${m.icon} ${m.label}`;
     info.textContent = `${s.loops}× · ${totalDuration({ imageCount: count, loops: s.loops, speed: s.speed }).toFixed(1)} s`;
+  };
+  effect([settings, images, videoClips, markers], () => {
+    const m = motionById(settings.get().motion);
+    root.hidden = !hasContent();
+    motion.textContent = `${m.icon} ${m.label}`;
+    showInfo();
   });
+  playhead.subscribe(showInfo);
 }
