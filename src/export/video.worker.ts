@@ -1,6 +1,7 @@
 import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, QUALITY_VERY_HIGH, getFirstEncodableVideoCodec } from 'mediabunny';
 import { renderFrame, sceneDuration, type Scene } from '../engine/render';
 import { frameCount } from '../engine/timeline';
+import { encodeProject } from './projectEncoder';
 import type { FromWorker, ToWorker } from './protocol';
 
 let output: Output | null = null;
@@ -17,7 +18,14 @@ self.addEventListener('message', (e: MessageEvent<ToWorker>) => {
     return;
   }
   cancelled = false;
-  encode(msg.scene, msg.fps).catch((err: unknown) => {
+  const job = msg.type === 'start'
+    ? encode(msg.scene, msg.fps)
+    : encodeProject(msg.scene, msg.clips, msg.fps, {
+      post,
+      isCancelled: () => cancelled,
+      setOutput: (o) => { output = o; },
+    });
+  job.catch((err: unknown) => {
     if (cancelled) post({ type: 'cancelled' });
     else post({ type: 'error', message: err instanceof Error ? err.message : String(err) });
   });

@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Scene } from '../../src/engine/render';
+import type { VideoProjectScene } from '../../src/engine/renderVideo';
 import type { FromWorker } from '../../src/export/protocol';
-import { ExportCancelled, exportVideo } from '../../src/export/video';
+import { ExportCancelled, exportVideo, exportVideoProject } from '../../src/export/video';
 
 type Listener = (e: { data: FromWorker }) => void;
 
@@ -81,5 +82,14 @@ describe('exportVideo', () => {
     expect(blob).toBeInstanceOf(Blob);
     expect(blob.type).toBe('video/mp4');
     expect(worker.terminated).toBe(true);
+  });
+
+  it('starts a project export and passes on the note of a silent result', async () => {
+    const job = exportVideoProject({} as VideoProjectScene, [], () => {});
+    const w = FakeWorker.instances[0]!;
+    expect(w.posted[0]).toMatchObject({ type: 'startProject', clips: [], fps: 30 });
+    w.emit({ type: 'done', buffer: new ArrayBuffer(4), mimeType: 'video/mp4', note: 'Exported without sound' });
+    await expect(job.result).resolves.toBeInstanceOf(Blob);
+    expect(job.note()).toBe('Exported without sound');
   });
 });
