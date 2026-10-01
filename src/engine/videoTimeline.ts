@@ -217,7 +217,7 @@ export interface VideoFramePosition {
 }
 
 /** Just before a cut the shot shows its own last frame, never the next shot's first. */
-const BEFORE_CUT = 1e-3;
+export const BEFORE_CUT = 1e-3;
 
 function ref(shot: Shot, t: number): ShotRef {
   const time = shot.sourceStart + Math.max(0, t - shot.start);

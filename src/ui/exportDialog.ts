@@ -52,7 +52,7 @@ export function mountExportDialog(dialog: HTMLDialogElement, preview: PreviewApi
       const size = `${scene.width} × ${scene.height}`;
       if (kind === 'png') return `${size} · PNG · FRAME AT ${playhead.get().toFixed(1)} s`;
       const d = scene.layout.duration;
-      return `${size} · ${d.toFixed(1)} s · ${frameCount(d, FPS)} frames${scene.settings.audio ? ' · SOUND' : ''}`;
+      return `${size} · ${d.toFixed(1)} s · ${frameCount(d, FPS)} frames${scene.settings.audio && videoClips.get().some((c) => c.hasAudio) ? ' · SOUND' : ''}`;
     }
     const scene = buildScene();
     if (!scene) return '';
@@ -193,7 +193,11 @@ export function mountExportDialog(dialog: HTMLDialogElement, preview: PreviewApi
 
   async function startVideoMode(): Promise<void> {
     const scene = videoScene.get();
-    if (!scene) return;
+    if (!scene) {
+      phase = { name: 'error', message: 'The video is still being prepared – try again in a moment.' };
+      render();
+      return;
+    }
     if (kind === 'png') {
       try {
         const blob = await preview.videoStill();

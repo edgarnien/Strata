@@ -2,7 +2,7 @@ import { motionById } from './motions';
 import { hashSeed } from './rng';
 import { barOrder, movedStrokes, paintBase, type BarLook } from './strokes';
 import type { Ctx2D, DrawSource, Fit, Settings } from './types';
-import { videoPositionAt, type Layout, type VideoFramePosition } from './videoTimeline';
+import { BEFORE_CUT, videoPositionAt, type Layout, type VideoFramePosition } from './videoTimeline';
 
 export interface VideoLooks {
   intro: BarLook | null;
@@ -76,9 +76,6 @@ export interface FrameRef {
   clipId: string;
   time: number;
 }
-
-/** Just before a cut: the shot's own last frame. */
-const BEFORE_CUT = 1e-3;
 
 /** The clip frames whose looks a layout needs, read right at each cut. */
 export function lookFrames(lay: Layout): { intro: FrameRef | null; outro: FrameRef | null; transitions: { before: FrameRef; after: FrameRef }[] } {

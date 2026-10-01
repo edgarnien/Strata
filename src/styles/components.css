@@ -513,7 +513,7 @@
   &.is-selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--text); }
   &:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 }
-.tl__edge { position: absolute; top: 0; bottom: 0; background: rgb(255 255 255 / .28); pointer-events: none; }
+.tl__edge { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, rgb(255 255 255 / .28) 0 2px, transparent 2px 6px); pointer-events: none; }
 .tl__head { position: absolute; top: -10px; bottom: -4px; width: 2px; translate: -1px 0; background: var(--text); pointer-events: none; z-index: 3; }
 .tl__remove {
   position: absolute;

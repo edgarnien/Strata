@@ -39,7 +39,8 @@ export function removeVideoClip(index: number): void {
   if (next.length === 0) playhead.set(0);
   // Release resources only after the store no longer references the clip.
   closeClip(entry.id);
-  URL.revokeObjectURL(entry.url);
+  // The preview player drops its <video> elements on its next frame's sync; revoking sooner makes them fail to load.
+  requestAnimationFrame(() => requestAnimationFrame(() => URL.revokeObjectURL(entry.url)));
   URL.revokeObjectURL(entry.stripUrl);
 }
 
