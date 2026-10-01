@@ -246,7 +246,7 @@
   border-top: 1px solid var(--line);
 }
 .sidebar__export { flex: none; width: 100%; margin-top: auto; }
-/* MOTION and MOVE share a row; PICTURE | STROKES (only while something moves) runs underneath. */
+/* MOTION and MOVE share a row. */
 .sidebar .group--motion {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -254,10 +254,7 @@
 
   & > * { grid-column: 1 / -1; }
   & > [data-tool="motion"] { grid-column: 1; }
-  & > [data-tool="move"] { display: contents; }
-  & > [data-tool="move"] > .field { grid-column: 2; grid-row: 1; }
-  & > [data-tool="move"] > .segmented { grid-column: 1 / -1; }
-  & > [data-tool="move"] .segmented .btn { min-height: 28px; height: 28px; font-size: 10px; }
+  & > [data-tool="move"] { grid-column: 2; grid-row: 1; }
 }
 
 /* ---------- transport ---------- */

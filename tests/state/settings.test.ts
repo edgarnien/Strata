@@ -52,8 +52,9 @@ describe('load / save', () => {
 });
 
 describe('MOVE settings', () => {
-  it('keeps a valid move and falls back to OFF / whole picture otherwise', () => {
-    expect(parseSettings({ move: 'depth', moveStrokes: true })).toMatchObject({ move: 'depth', moveStrokes: true });
-    expect(parseSettings({ move: 'spin', moveStrokes: 'yes' })).toMatchObject({ move: 'off', moveStrokes: false });
+  it('keeps a valid move and falls back to OFF otherwise', () => {
+    expect(parseSettings({ move: 'depth' }).move).toBe('depth');
+    expect(parseSettings({ move: 'spin' }).move).toBe('off');
+    expect(parseSettings({ move: 'slide', moveStrokes: true })).not.toHaveProperty('moveStrokes');
   });
 });

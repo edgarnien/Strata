@@ -116,23 +116,15 @@ export function motionControl(): HTMLElement {
   });
 }
 
-/** MOVE, and – once something moves – whether the whole picture or only the strokes do. */
+/** MOVE: how the stroke layer moves while it builds up and falls away. */
 export function moveControl(): HTMLElement {
-  const menu = dropdown<MoveId>({
+  return dropdown<MoveId>({
     label: 'MOVE',
     options: () => MOVES.map((m) => ({ value: m.id, icon: m.icon, label: m.label })),
     value: () => settings.get().move,
     onSelect: (move) => patchSettings({ move }),
     deps: [settings],
   });
-  const target = (moveStrokes: boolean, text: string) => {
-    const btn = h('button', { class: 'btn', type: 'button', onclick: () => patchSettings({ moveStrokes }) }, text);
-    effect([settings], () => btn.setAttribute('aria-pressed', String(settings.get().moveStrokes === moveStrokes)));
-    return btn;
-  };
-  const what = h('div', { class: 'segmented', role: 'group', 'aria-label': 'What moves' }, target(false, 'PICTURE'), target(true, 'STROKES'));
-  effect([settings], () => { what.hidden = settings.get().move === 'off'; });
-  return h('div', { class: 'field' }, menu, what);
 }
 
 export function formatControl(): HTMLElement {

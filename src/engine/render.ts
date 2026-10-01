@@ -1,9 +1,9 @@
 import { clipDraw, drawFitted, fillBars } from './draw';
 import { motionById, type Motion } from './motions';
 import { paceLevel } from './motions/pace';
-import { DEPTH_MIN, SLIDE_SHIFT, accentProgress, depthScale, ease } from './move';
+import { DEPTH_MIN, SLIDE_SHIFT, ease } from './move';
 import { hashSeed, mulberry32, shuffled } from './rng';
-import { positionAt, totalDuration, type FramePosition } from './timeline';
+import { positionAt, totalDuration } from './timeline';
 import type { Bar, Ctx2D, Fit, Settings } from './types';
 
 export interface ImageLayer {
@@ -89,7 +89,6 @@ export function renderFrame(ctx: Ctx2D, scene: Scene, t: number): number {
   const pos = positionAt(t, { imageCount: n, loops: s.loops, speed: s.speed });
   const motion = motionById(s.motion);
   const imgMask = imgMaskActive(scene);
-  if (s.move !== 'off' && !s.moveStrokes) return renderTravel(ctx, scene, pos, motion, imgMask);
   const chain = n >= 2;
   const handover = chain && !imgMask && motion.covered === 'middle' && pos.progress >= 0.5;
   const index = handover ? pos.nextImageIndex : pos.imageIndex;
@@ -117,47 +116,8 @@ export function renderFrame(ctx: Ctx2D, scene: Scene, t: number): number {
 }
 
 /**
- * MOVE with the whole picture: the current clip moves back into the frame (DEPTH) or out to the
- * left (SLIDE) while the next one builds up in front of it in the motion's strokes, its look
- * first, led by a few bars in the stroke colour. Both rest at the cycle ends, where the next clip
- * fills the frame and becomes the one that moves on.
- */
-function renderTravel(ctx: Ctx2D, scene: Scene, pos: FramePosition, motion: Motion, imgMask: boolean): number {
-  const { width: w, height: h, fit, layers, settings: s } = scene;
-  const p = pos.progress;
-  const next = layers[pos.nextImageIndex];
-  const depth = s.move === 'depth';
-
-  ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 0, w, h);
-  ctx.save();
-  if (depth) {
-    const k = depthScale(p);
-    ctx.translate((w * (1 - k)) / 2, (h * (1 - k)) / 2);
-    ctx.scale(k, k);
-  } else {
-    ctx.translate(-SLIDE_SHIFT * w * ease(p), 0);
-  }
-  drawFitted(ctx, layers[pos.imageIndex].bitmap, w, h, fit);
-  ctx.restore();
-
-  ctx.save();
-  ctx.translate(depth ? 0 : SLIDE_SHIFT * w * (1 - ease(p)), 0);
-  const order = barOrder(next, true, scene.seed, pos.nextImageIndex);
-  const front = {
-    width: w, height: h, fit, bars: order.bars, lead: order.lead, cycle: pos.cycle,
-    frameIndex: pos.frameIndex, seed: scene.seed, color: s.color, image: next.bitmap, imgMask: true,
-  };
-  if (!imgMask) motion.draw(ctx, { ...front, progress: accentProgress(p), nextImage: swatch(s.color, w, h) });
-  motion.draw(ctx, { ...front, progress: p, nextImage: next.bitmap });
-  ctx.restore();
-  return p >= 0.5 ? pos.nextImageIndex : pos.imageIndex;
-}
-
-/**
- * MOVE with the photo held still: the stroke layer comes forward (DEPTH) or slides in from the
- * right and out to the left (SLIDE) as it builds up and falls away. It sits in place wherever the
+ * MOVE: the stroke layer comes forward (DEPTH) or slides in from the right and out to the left
+ * (SLIDE) as it builds up and falls away, over a photo that stays still so text stays readable. It sits in place wherever the
  * strokes are complete, so the look and the hand-over between clips stay put.
  */
 function movedStrokes(ctx: Ctx2D, scene: Scene, motion: Motion, progress: number, imgMask: boolean): Ctx2D {
@@ -189,25 +149,6 @@ function placeRects(ctx: Ctx2D, place: (...r: Rect) => Rect): Ctx2D {
       return Reflect.set(target, key, value, target);
     },
   });
-}
-
-let swatchCache: { key: string; canvas: OffscreenCanvas } | null = null;
-const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
-
-/** A plain colour in the frame's aspect ratio, so the transitions can draw it like a clip. */
-function swatch(color: string, w: number, h: number): OffscreenCanvas {
-  const g = gcd(w, h);
-  const key = `${color}:${w / g}x${h / g}`;
-  if (swatchCache?.key !== key) {
-    const canvas = new OffscreenCanvas(w / g, h / g);
-    const c = canvas.getContext('2d');
-    if (c) {
-      c.fillStyle = color;
-      c.fillRect(0, 0, canvas.width, canvas.height);
-    }
-    swatchCache = { key, canvas };
-  }
-  return swatchCache.canvas;
 }
 
 /**

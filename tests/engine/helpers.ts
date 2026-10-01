@@ -76,7 +76,7 @@ export const count = (calls: string[], prefix: string) => calls.filter((c) => c.
 
 export const TEST_SETTINGS: Settings = {
   size: 80, stretch: 0, threshold: 35, removeFront: false, sensitivity: 50, color: '#FFFFFF',
-  imgMask: false, motion: 'buildUp', speed: 1, loops: 1, format: '9:16', move: 'off', moveStrokes: false,
+  imgMask: false, motion: 'buildUp', speed: 1, loops: 1, format: '9:16', move: 'off',
 };
 
 export const barKey = (bar: Bar): string => `${bar.x},${bar.y}`;
