@@ -97,9 +97,10 @@ export class VideoPlayer {
   }
 
   private start(el: HTMLVideoElement): void {
-    el.play().catch(() => {
-      // Autoplay rules (iOS) can refuse sound: carry on muted rather than freeze.
-      if (el.muted) return;
+    el.play().catch((e: unknown) => {
+      // Only NotAllowedError means the browser blocked sound; other errors (AbortError, etc.) are expected.
+      if (!(e instanceof DOMException && e.name === 'NotAllowedError')) return;
+      if (el.muted || this.soundBlocked) return;
       this.soundBlocked = true;
       el.muted = true;
       void el.play().catch(() => undefined);
