@@ -55,6 +55,33 @@ export function addInto(mix: Stereo, chunk: Stereo, at: number, gain: (t: number
   }
 }
 
+/** One decoded audio packet: planar channels, its sample rate and its timestamp in the source. */
+export interface SoundChunk {
+  planes: Float32Array[];
+  sampleRate: number;
+  timestamp: number;
+}
+
+/**
+ * Lays one shot's decoded sound into the mix, its first sample at output time `at`.
+ * The packets are joined and resampled as one stream: resampling each on its own rounds every
+ * chunk to whole frames, so neighbours overlap (summing to a click) or leave gaps.
+ */
+export function addShotSound(mix: Stereo, chunks: readonly SoundChunk[], at: number, gain: (t: number) => number, rate = MIX_RATE): void {
+  if (chunks.length === 0) return;
+  const channels = chunks[0].planes.length;
+  const planes = Array.from({ length: channels }, (_, ch) => {
+    const joined = new Float32Array(chunks.reduce((n, c) => n + c.planes[ch].length, 0));
+    let pos = 0;
+    for (const c of chunks) {
+      joined.set(c.planes[ch], pos);
+      pos += c.planes[ch].length;
+    }
+    return resample(joined, chunks[0].sampleRate, rate);
+  });
+  addInto(mix, toStereo(planes), at, gain, rate);
+}
+
 /** Frames [from, to) of the mix as one f32-planar buffer: the left plane, then the right. */
 export function planarSlice(mix: Stereo, from: number, to: number): Float32Array {
   const left = mix[0].subarray(from, to);

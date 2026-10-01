@@ -6,7 +6,7 @@ import {
 import { renderVideoFrame, videoPosition, type VideoProjectScene } from '../engine/renderVideo';
 import { frameCount } from '../engine/timeline';
 import type { VideoFramePosition } from '../engine/videoTimeline';
-import { MIX_RATE, addInto, createMix, planarSlice, resample, shotGain, toStereo, type Stereo } from './audioMix';
+import { MIX_RATE, addShotSound, createMix, planarSlice, shotGain, type SoundChunk, type Stereo } from './audioMix';
 import type { ClipFile, FromWorker } from './protocol';
 
 export interface EncodeHooks {
@@ -143,6 +143,7 @@ async function mixSound(scene: VideoProjectScene, clips: ClipFile[], inputs: Map
     await decoding(names.get(shot.clipId) ?? shot.clipId, async () => {
       const track = await inputs.get(shot.clipId)?.getPrimaryAudioTrack();
       if (!track) return;
+      const chunks: SoundChunk[] = [];
       for await (const sample of new AudioSampleSink(track).samples(shot.sourceStart, shot.sourceEnd)) {
         try {
           if (hooks.isCancelled()) throw new EncodeCancelled();
@@ -150,12 +151,16 @@ async function mixSound(scene: VideoProjectScene, clips: ClipFile[], inputs: Map
           for (let ch = 0; ch < sample.numberOfChannels; ch++) {
             const plane = new Float32Array(sample.numberOfFrames);
             sample.copyTo(plane, { planeIndex: ch, format: 'f32-planar' });
-            planes.push(resample(plane, sample.sampleRate, MIX_RATE));
+            planes.push(plane);
           }
-          addInto(mix, toStereo(planes), shot.start + (sample.timestamp - shot.sourceStart), (t) => shotGain(lay, i, t));
+          chunks.push({ planes, sampleRate: sample.sampleRate, timestamp: sample.timestamp });
         } finally {
           sample.close();
         }
+      }
+      // The whole shot is resampled as one stream, anchored at its first sample.
+      if (chunks.length > 0) {
+        addShotSound(mix, chunks, shot.start + (chunks[0].timestamp - shot.sourceStart), (t) => shotGain(lay, i, t));
       }
     });
     hooks.post({ type: 'progress', value: (AUDIO_SHARE * (i + 1)) / lay.shots.length });

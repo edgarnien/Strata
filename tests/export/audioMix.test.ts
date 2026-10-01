@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { layout } from '../../src/engine/videoTimeline';
-import { addInto, createMix, planarSlice, resample, shotGain, toStereo } from '../../src/export/audioMix';
+import { MIX_RATE, addInto, addShotSound, createMix, planarSlice, resample, shotGain, toStereo } from '../../src/export/audioMix';
 
 const f32 = (...v: number[]) => Float32Array.from(v);
 const lay = (imgMask: boolean) => layout({
@@ -55,5 +55,21 @@ describe('addInto / planarSlice', () => {
   it('slices the mix into one planar buffer, left then right', () => {
     const mix: [Float32Array, Float32Array] = [f32(1, 2, 3), f32(4, 5, 6)];
     expect([...planarSlice(mix, 1, 3)]).toEqual([2, 3, 5, 6]);
+  });
+});
+
+describe('addShotSound', () => {
+  it('joins consecutive 44.1 kHz packets without overlap or gap', () => {
+    const rate = 44_100;
+    const mix = createMix(0.2);
+    const chunks = [0, 1, 2, 3].map((i) => ({
+      planes: [new Float32Array(1024).fill(1)], sampleRate: rate, timestamp: (i * 1024) / rate,
+    }));
+    addShotSound(mix, chunks, 0, () => 1);
+    const span = Math.round((4 * 1024 * MIX_RATE) / rate);
+    const left = [...mix[0].subarray(0, span)];
+    expect(Math.max(...left)).toBeLessThanOrEqual(1);
+    expect(Math.min(...left)).toBe(1); // no zero gap inside the span
+    expect(mix[0][span]).toBe(0);
   });
 });
