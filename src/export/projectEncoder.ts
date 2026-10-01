@@ -77,6 +77,8 @@ export async function encodeProject(scene: VideoProjectScene, clips: ClipFile[],
     const positions: VideoFramePosition[] = Array.from({ length: total }, (_, f) => videoPosition(scene, f / fps));
     // One decoder per clip and role, each fed its timestamps in rising order (decodes every packet once).
     const times = new Map<string, number[]>();
+    /** Per clip: its first frame (null if unreadable), shown when a source time falls before the first frame has started. */
+    const firstFrames = new Map<string, Promise<HTMLCanvasElement | OffscreenCanvas | null>>();
     const push = (key: string, t: number) => {
       const list = times.get(key) ?? [];
       list.push(t);
@@ -93,6 +95,11 @@ export async function encodeProject(scene: VideoProjectScene, clips: ClipFile[],
         const track = await inputs.get(clipId)?.getPrimaryVideoTrack();
         if (!track) throw new Error('it has no video track');
         streams.set(key, new CanvasSink(track, { width, height, fit: scene.fit, poolSize: 2 }).canvasesAtTimestamps(list));
+        if (!firstFrames.has(clipId)) {
+          // Own sink without a pool: this canvas must outlive the stream's recycled ones.
+          const sink = new CanvasSink(track, { width, height, fit: scene.fit });
+          firstFrames.set(clipId, sink.getCanvas(await track.getFirstTimestamp()).then((w) => w?.canvas ?? null, () => null));
+        }
       });
     }
     const last = new Map<string, HTMLCanvasElement | OffscreenCanvas>();
@@ -102,8 +109,10 @@ export async function encodeProject(scene: VideoProjectScene, clips: ClipFile[],
       if (!stream) throw new Error(`No decoder for ${key}`);
       const clipId = key.slice(0, key.lastIndexOf(':'));
       const r = await decoding(names.get(clipId) ?? clipId, () => stream.next());
-      // Before a clip's first frame there is none yet: keep the previous picture (or black).
-      const canvasOut = r.done || !r.value ? (last.get(key) ?? blank) : r.value.canvas;
+      // Before a clip's first frame there is none yet: keep the previous picture, else show the clip's first frame (as the preview does).
+      const canvasOut = r.done || !r.value
+        ? (last.get(key) ?? await firstFrames.get(clipId) ?? blank)
+        : r.value.canvas;
       last.set(key, canvasOut);
       return canvasOut;
     };
