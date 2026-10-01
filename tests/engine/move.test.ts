@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ease } from '../../src/engine/move';
 import { renderFrame, type ImageLayer, type Scene } from '../../src/engine/render';
-import type { MoveId, Settings } from '../../src/engine/types';
+import { MOVE_IDS, type Settings } from '../../src/engine/types';
 import { TEST_SETTINGS, count, fakeImage, record, testBars } from './helpers';
 
 const layer = (id: string): ImageLayer => ({
@@ -23,7 +23,11 @@ describe('ease', () => {
   });
 });
 
-for (const move of ['depth', 'slide'] as MoveId[]) {
+it('offers the stroke moves', () => {
+  expect(MOVE_IDS).toEqual(['off', 'depth', 'slide', 'scatter', 'lines', 'sway']);
+});
+
+for (const move of MOVE_IDS.filter((m) => m !== 'off')) {
   describe(`MOVE ${move.toUpperCase()}`, () => {
     it('moves only the strokes; the photo stays where it is', () => {
       const moving = record((ctx) => renderFrame(ctx, scene({ move }), 1.5));
