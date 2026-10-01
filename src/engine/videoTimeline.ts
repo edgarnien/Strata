@@ -54,7 +54,7 @@ export interface Layout {
   outro: boolean;
 }
 
-const EPS = 1e-9;
+export const EPS = 1e-9;
 
 export const snapToFrame = (t: number): number => Math.round(t * FPS) / FPS;
 
@@ -188,4 +188,84 @@ export function validMarkerTime(input: VideoTimelineInput, clipId: string, time:
     }
   }
   return null;
+}
+
+export type Phase = 'none' | 'intro' | 'transition' | 'outro';
+
+export interface ShotRef {
+  shotIndex: number;
+  clipId: string;
+  sourceTime: number;
+  lane: 0 | 1;
+}
+
+export interface VideoFramePosition {
+  /** Fills the frame. */
+  shot: ShotRef;
+  /** Shown inside the bars during an IMG MASK overlap. */
+  next: ShotRef | null;
+  phase: Phase;
+  /** Transition i sits between shot i and shot i + 1; −1 outside transitions. */
+  transitionIndex: number;
+  /** Which look the bars follow: the one before the cut or the one after it. */
+  side: 'before' | 'after';
+  /** 0..1 in the motions' cycle. */
+  progress: number;
+  /** Seeds the stroke pattern: 0 = intro, i + 1 = transition i, shots.length = outro. */
+  cycle: number;
+  frameIndex: number;
+}
+
+/** Just before a cut the shot shows its own last frame, never the next shot's first. */
+const BEFORE_CUT = 1e-3;
+
+function ref(shot: Shot, t: number): ShotRef {
+  const time = shot.sourceStart + Math.max(0, t - shot.start);
+  return {
+    shotIndex: shot.index,
+    clipId: shot.clipId,
+    lane: shot.lane,
+    sourceTime: Math.max(shot.sourceStart, Math.min(time, shot.sourceEnd - BEFORE_CUT)),
+  };
+}
+
+/** Cycle progress for a stroke phase at u ∈ [−½, ½] around full cover (u = 0). */
+function cycleProgress(u: number, covered: 'middle' | 'ends'): number {
+  if (covered === 'middle') return 0.5 + u;
+  return u < 0 ? 1 + u : u;
+}
+
+/**
+ * What output time t shows: the shot (and with IMG MASK the next one), and – inside a transition,
+ * the intro or the outro – the progress the motions expect, with full cover on the cut.
+ */
+export function videoPositionAt(t: number, lay: Layout, covered: 'middle' | 'ends'): VideoFramePosition {
+  const { shots, duration, dauer } = lay;
+  if (shots.length === 0) throw new Error('videoPositionAt needs at least one shot');
+  const w = 2 * dauer;
+  const tt = Math.min(Math.max(0, t), Math.max(0, duration - 1e-6));
+  const frameIndex = Math.floor(tt * FPS + 1e-6);
+  let i = 0;
+  while (i + 1 < shots.length && shots[i + 1].start <= tt + EPS) i++;
+
+  if (lay.imgMask && i > 0 && tt < shots[i].start + w) {
+    return {
+      shot: ref(shots[i - 1], tt), next: ref(shots[i], tt), phase: 'transition', transitionIndex: i - 1,
+      side: 'before', progress: (tt - shots[i].start) / w, cycle: i, frameIndex,
+    };
+  }
+  const shot = ref(shots[i], tt);
+  const at = (phase: Phase, u: number, side: 'before' | 'after', transitionIndex: number, cycle: number): VideoFramePosition =>
+    ({ shot, next: null, phase, transitionIndex, side, progress: cycleProgress(u, covered), cycle, frameIndex });
+
+  if (!lay.imgMask) {
+    if (i > 0 && tt < shots[i].start + dauer) return at('transition', (tt - shots[i].start) / w, 'after', i - 1, i);
+    if (i + 1 < shots.length && tt >= shots[i + 1].start - dauer) {
+      return at('transition', (tt - shots[i + 1].start) / w, 'before', i, i + 1);
+    }
+  }
+  if (lay.intro && tt < dauer) return at('intro', tt / w, 'after', -1, 0);
+  const last = duration - 1 / FPS;
+  if (lay.outro && tt >= last - dauer) return at('outro', Math.min(0, (tt - last) / w), 'before', -1, shots.length);
+  return { shot, next: null, phase: 'none', transitionIndex: -1, side: 'before', progress: 0, cycle: 0, frameIndex };
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  axisLength, clipAt, dauerLimit, layout, outputTimeOf, shotSpans, validMarkerTime, type VideoTimelineInput,
+  axisLength, clipAt, dauerLimit, layout, outputTimeOf, shotSpans, validMarkerTime, videoPositionAt, type VideoTimelineInput,
 } from '../../src/engine/videoTimeline';
 
 const clip = (id: string, duration: number) => ({ id, duration });
@@ -94,5 +94,70 @@ describe('clip axis', () => {
   it('turns a clip time into output time, also across IMG MASK overlaps', () => {
     expect(outputTimeOf(layout(input()), 'b', 1)).toBe(4);
     expect(outputTimeOf(layout(input({ imgMask: true })), 'b', 1)).toBe(3);
+  });
+});
+
+describe('videoPositionAt – colour strokes', () => {
+  const at = (t: number, over: Partial<VideoTimelineInput> = {}, covered: 'middle' | 'ends' = 'middle') =>
+    videoPositionAt(t, layout(input(over)), covered);
+
+  it('plays the pure video away from cuts', () => {
+    expect(at(1)).toMatchObject({ phase: 'none', next: null, shot: { clipId: 'a', sourceTime: 1 } });
+    expect(at(2.4).phase).toBe('none');
+  });
+  it('builds up before the cut, covers on it and falls away after it', () => {
+    expect(at(2.75)).toMatchObject({ phase: 'transition', transitionIndex: 0, side: 'before', progress: 0.25, shot: { clipId: 'a' } });
+    expect(at(3)).toMatchObject({ side: 'after', progress: 0.5, shot: { clipId: 'b', sourceTime: 0 } });
+    expect(at(3.25)).toMatchObject({ side: 'after', progress: 0.75, shot: { clipId: 'b' } });
+  });
+  it('puts full cover exactly on the cut frame and the last frame of shot a right before it', () => {
+    expect(at(90 / 30).progress).toBe(0.5);
+    const before = at(89 / 30);
+    expect(before.shot.clipId).toBe('a');
+    expect(before.shot.sourceTime).toBeLessThan(3);
+  });
+  it('never shows the next shot inside a clip before the marker', () => {
+    const p = at(2 - 1e-4, { clips: [clip('a', 6)], markers: [mk('a', 2)] });
+    expect(p.shot.shotIndex).toBe(0);
+    expect(p.shot.sourceTime).toBeLessThanOrEqual(2 - 1e-3);
+  });
+  it('maps a motion that starts covered so the cut sits at 0 / 1', () => {
+    expect(at(2.75, {}, 'ends').progress).toBe(0.75);
+    expect(at(3, {}, 'ends').progress).toBe(0);
+    expect(at(3.25, {}, 'ends').progress).toBe(0.25);
+  });
+  it('keeps progress inside [0, 1] for every frame of a capped layout', () => {
+    const lay = layout(input({ clips: [clip('a', 3), clip('b', 0.6), clip('c', 3)], intro: true, outro: true }));
+    for (let f = 0; f < Math.round(lay.duration * 30); f++) {
+      const p = videoPositionAt(f / 30, lay, 'middle');
+      expect(p.progress).toBeGreaterThanOrEqual(0);
+      expect(p.progress).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe('videoPositionAt – IMG MASK', () => {
+  it('shows the next shot in the bars over the 2 · D overlap', () => {
+    const lay = layout(input({ imgMask: true }));
+    expect(videoPositionAt(2.5, lay, 'middle')).toMatchObject({
+      phase: 'transition', transitionIndex: 0, side: 'before', progress: 0.5,
+      shot: { clipId: 'a', sourceTime: 2.5 }, next: { clipId: 'b', sourceTime: 0.5 },
+    });
+    expect(videoPositionAt(3, lay, 'middle')).toMatchObject({ phase: 'none', next: null, shot: { clipId: 'b', sourceTime: 1 } });
+  });
+});
+
+describe('videoPositionAt – intro and outro', () => {
+  const lay = layout(input({ clips: [clip('a', 4)], intro: true, outro: true }));
+  const last = 4 - 1 / 30;
+  it('starts covered and falls away over D', () => {
+    expect(videoPositionAt(0, lay, 'middle')).toMatchObject({ phase: 'intro', side: 'after', progress: 0.5, cycle: 0 });
+    expect(videoPositionAt(0.25, lay, 'middle').progress).toBe(0.75);
+    expect(videoPositionAt(0, lay, 'ends').progress).toBe(0);
+  });
+  it('builds up over D and covers the last frame', () => {
+    expect(videoPositionAt(last, lay, 'middle')).toMatchObject({ phase: 'outro', side: 'before', progress: 0.5, cycle: 1 });
+    expect(videoPositionAt(last - 0.25, lay, 'middle').progress).toBeCloseTo(0.25, 9);
+    expect(videoPositionAt(2, lay, 'middle').phase).toBe('none');
   });
 });
