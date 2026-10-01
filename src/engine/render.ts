@@ -1,7 +1,7 @@
 import { clipDraw, drawFitted, fillBars } from './draw';
 import { motionById, type Motion } from './motions';
 import { paceLevel } from './motions/pace';
-import { CASCADE_STAGGER, DEPTH_MIN, RISE_SHIFT, SLIDE_SHIFT, ZIPPER_SHIFT, ease } from './move';
+import { CASCADE_STAGGER, COMB_SHIFT, DEPTH_MIN, SLIDE_SHIFT, ZIPPER_SHIFT, ease } from './move';
 import { hashSeed, mulberry32, shuffled } from './rng';
 import { positionAt, totalDuration } from './timeline';
 import type { Bar, Ctx2D, Fit, Settings } from './types';
@@ -118,8 +118,8 @@ export function renderFrame(ctx: Ctx2D, scene: Scene, t: number): number {
 /**
  * MOVE: the strokes move as they build up and fall away, over a photo that stays still so text
  * stays readable. DEPTH brings the layer forward and SLIDE slides it in from the right; the grid
- * moves STEP (sideways), RISE (up), CASCADE (columns up one after another) and ZIPPER (rows from
- * alternating sides) only move by whole columns and bar heights, so bars always stay aligned to
+ * moves STEP (sideways), CASCADE (columns up one after another), ZIPPER (rows from alternating
+ * sides) and COMB (columns from above and below in turn) only move by whole columns and bar heights, so bars always stay aligned to
  * the columns and meet corner on corner. Every move sits in place wherever the strokes are
  * complete, so the look and the hand-over between clips stay put.
  */
@@ -146,8 +146,8 @@ function movedStrokes(ctx: Ctx2D, scene: Scene, motion: Motion, progress: number
   switch (move) {
     case 'step':
       return shiftCells(ctx, g, () => [dir * steps(away, SLIDE_SHIFT * cols), 0]);
-    case 'rise':
-      return shiftCells(ctx, g, () => [0, dir * steps(away, RISE_SHIFT * rows)]);
+    case 'comb':
+      return shiftCells(ctx, g, (c) => [0, (c % 2 === 0 ? 1 : -1) * steps(away, COMB_SHIFT * rows)]);
     case 'cascade':
       return shiftCells(ctx, g, (c) => {
         const lag = (c / Math.max(1, cols - 1)) * CASCADE_STAGGER;

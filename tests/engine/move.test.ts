@@ -24,7 +24,7 @@ describe('ease', () => {
 });
 
 it('offers the stroke moves', () => {
-  expect(MOVE_IDS).toEqual(['off', 'depth', 'slide', 'step', 'rise', 'cascade', 'zipper']);
+  expect(MOVE_IDS).toEqual(['off', 'depth', 'slide', 'step', 'cascade', 'zipper', 'comb']);
 });
 
 for (const move of MOVE_IDS.filter((m) => m !== 'off')) {
@@ -57,7 +57,7 @@ describe('grid moves stay on the grid', () => {
   // Test grid: bars of 10 × 30 – every outline must sit on that grid, at full size, in every frame,
   // so bars only ever meet corner on corner.
   const cells = (rects: string[]) => rects.map((r) => r.split(' ').slice(1).map(Number));
-  for (const move of ['step', 'rise', 'cascade', 'zipper'] as const) {
+  for (const move of ['step', 'cascade', 'zipper', 'comb'] as const) {
     it(`${move.toUpperCase()} keeps every bar on the grid and visibly moves it`, () => {
       let farthest = 0;
       for (let t = 0.1; t < 6; t += 0.37) {
@@ -72,15 +72,27 @@ describe('grid moves stay on the grid', () => {
     });
   }
 
-  it('STEP and ZIPPER shift sideways, RISE and CASCADE up and down', () => {
-    const at = (move: 'step' | 'rise' | 'cascade' | 'zipper') =>
+  it('STEP and ZIPPER shift sideways, CASCADE and COMB up and down', () => {
+    const at = (move: 'step' | 'cascade' | 'zipper' | 'comb') =>
       record((ctx) => renderFrame(ctx, scene({ move }), 0.9)).filter((c) => c.startsWith('rect '));
     const still = record((ctx) => renderFrame(ctx, scene({}), 0.9)).filter((c) => c.startsWith('rect '));
     const xs = (rects: string[]) => rects.map((r) => r.split(' ')[1]).sort().join();
     const ys = (rects: string[]) => rects.map((r) => r.split(' ')[2]).sort().join();
     expect(ys(at('step'))).toBe(ys(still));
     expect(ys(at('zipper'))).toBe(ys(still));
-    expect(xs(at('rise'))).toBe(xs(still));
+    expect(xs(at('comb'))).toBe(xs(still));
     expect(xs(at('cascade'))).toBe(xs(still));
   });
+});
+
+it('COMB moves neighbouring columns in opposite directions', () => {
+  const rects = record((ctx) => renderFrame(ctx, scene({ move: 'comb' }), 0.9)).filter((c) => c.startsWith('rect '));
+  const still = record((ctx) => renderFrame(ctx, scene({}), 0.9)).filter((c) => c.startsWith('rect '));
+  const shiftOf = (x: number) => {
+    const moved = rects.filter((r) => Number(r.split(' ')[1]) === x).map((r) => Number(r.split(' ')[2]));
+    const placed = still.filter((r) => Number(r.split(' ')[1]) === x).map((r) => Number(r.split(' ')[2]));
+    return Math.sign(Math.min(...moved) - Math.min(...placed));
+  };
+  const signs = [0, 10, 20, 30].map(shiftOf).filter((v) => Number.isFinite(v) && v !== 0);
+  expect(new Set(signs).size).toBe(2);
 });
