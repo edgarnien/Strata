@@ -10,7 +10,7 @@ export const MOTION_IDS = ['buildUp', 'impulse', 'wave', 'fade', 'glitch', 'reve
 export type MotionId = (typeof MOTION_IDS)[number];
 
 /** Movement of the stroke layer on top of the transition (the photo always stays still). */
-export const MOVE_IDS = ['off', 'depth', 'slide', 'sway', 'offset', 'step'] as const;
+export const MOVE_IDS = ['off', 'depth', 'slide', 'step', 'rise', 'cascade', 'zipper'] as const;
 export type MoveId = (typeof MOVE_IDS)[number];
 
 export interface Size {

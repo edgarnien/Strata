@@ -1,7 +1,7 @@
 import { clipDraw, drawFitted, fillBars } from './draw';
 import { motionById, type Motion } from './motions';
 import { paceLevel } from './motions/pace';
-import { DEPTH_MIN, OFFSET_ROWS, SLIDE_SHIFT, SWAY_SHIFT, SWAY_WAVES, columnOffset, ease } from './move';
+import { CASCADE_STAGGER, DEPTH_MIN, RISE_SHIFT, SLIDE_SHIFT, ZIPPER_SHIFT, ease } from './move';
 import { hashSeed, mulberry32, shuffled } from './rng';
 import { positionAt, totalDuration } from './timeline';
 import type { Bar, Ctx2D, Fit, Settings } from './types';
@@ -117,52 +117,58 @@ export function renderFrame(ctx: Ctx2D, scene: Scene, t: number): number {
 
 /**
  * MOVE: the strokes move as they build up and fall away, over a photo that stays still so text
- * stays readable. DEPTH brings the layer forward, SLIDE slides it in from the right and out to the
- * left, SWAY straightens a wavy sideways shift. OFFSET and STEP move in whole grid steps – columns
- * up or down by bar heights, the layer sideways by columns – so bars always meet corner on corner.
- * Every move sits in place wherever the strokes are complete, so the look and the hand-over
- * between clips stay put.
+ * stays readable. DEPTH brings the layer forward and SLIDE slides it in from the right; the grid
+ * moves STEP (sideways), RISE (up), CASCADE (columns up one after another) and ZIPPER (rows from
+ * alternating sides) only move by whole columns and bar heights, so bars always stay aligned to
+ * the columns and meet corner on corner. Every move sits in place wherever the strokes are
+ * complete, so the look and the hand-over between clips stay put.
  */
 function movedStrokes(ctx: Ctx2D, scene: Scene, motion: Motion, progress: number, imgMask: boolean, grid: Bar[]): Ctx2D {
   const { width: w, height: h } = scene;
   const level = paceLevel(progress, imgMask);
   const startsCovered = !imgMask && motion.covered === 'ends';
   const away = 1 - ease(startsCovered ? 1 - level : level);
-  switch (scene.settings.move) {
-    case 'depth': {
-      const k = 1 - (1 - DEPTH_MIN) * away;
-      return placeRects(ctx, (x, y, bw, bh) => [w / 2 + (x - w / 2) * k, h / 2 + (y - h / 2) * k, bw * k, bh * k]);
-    }
-    case 'offset': {
-      const g = gridEdges(grid, w, h);
-      return placeRects(ctx, (x, y, bw, bh) => {
-        const c = g.col.get(x);
-        const r = g.row.get(y);
-        if (c === undefined || r === undefined) return [x, y, bw, bh];
-        const top = r + Math.round(away * OFFSET_ROWS * columnOffset(c));
-        return [x, edge(g.ys, top), bw, edge(g.ys, top + 1) - edge(g.ys, top)];
-      });
-    }
-    case 'step': {
-      const g = gridEdges(grid, w, h);
-      const building = imgMask || (startsCovered ? progress >= 0.5 : progress < 0.5);
-      const shift = (building ? 1 : -1) * Math.round(away * Math.max(1, Math.round(SLIDE_SHIFT * (g.xs.length - 1))));
-      return placeRects(ctx, (x, y, bw, bh) => {
-        const c = g.col.get(x);
-        if (c === undefined) return [x, y, bw, bh];
-        return [edge(g.xs, c + shift), y, edge(g.xs, c + shift + 1) - edge(g.xs, c + shift), bh];
-      });
-    }
-    case 'sway': {
-      const amp = SWAY_SHIFT * w * away;
-      return placeRects(ctx, (x, y, bw, bh) => [x + amp * Math.sin(((y + bh / 2) / h) * SWAY_WAVES * 2 * Math.PI), y, bw, bh]);
-    }
-    default: {
-      const building = imgMask || (startsCovered ? progress >= 0.5 : progress < 0.5);
-      const dx = (building ? 1 : -1) * SLIDE_SHIFT * w * away;
-      return placeRects(ctx, (x, y, bw, bh) => [x + dx, y, bw, bh]);
-    }
+  // In from the right / from below while building up, out to the left / upwards while falling away.
+  const dir = imgMask || (startsCovered ? progress >= 0.5 : progress < 0.5) ? 1 : -1;
+  const move = scene.settings.move;
+  if (move === 'depth') {
+    const k = 1 - (1 - DEPTH_MIN) * away;
+    return placeRects(ctx, (x, y, bw, bh) => [w / 2 + (x - w / 2) * k, h / 2 + (y - h / 2) * k, bw * k, bh * k]);
   }
+  if (move === 'slide') {
+    const dx = dir * SLIDE_SHIFT * w * away;
+    return placeRects(ctx, (x, y, bw, bh) => [x + dx, y, bw, bh]);
+  }
+  const g = gridEdges(grid, w, h);
+  const cols = g.xs.length - 1;
+  const rows = g.ys.length - 1;
+  const steps = (amount: number, cells: number) => Math.round(amount * Math.max(1, Math.round(cells)));
+  switch (move) {
+    case 'step':
+      return shiftCells(ctx, g, () => [dir * steps(away, SLIDE_SHIFT * cols), 0]);
+    case 'rise':
+      return shiftCells(ctx, g, () => [0, dir * steps(away, RISE_SHIFT * rows)]);
+    case 'cascade':
+      return shiftCells(ctx, g, (c) => {
+        const lag = (c / Math.max(1, cols - 1)) * CASCADE_STAGGER;
+        return [0, dir * steps(Math.min(1, Math.max(0, (away - (1 - lag) + CASCADE_STAGGER) / CASCADE_STAGGER)), rows)];
+      });
+    default:
+      return shiftCells(ctx, g, (_, r) => [(r % 2 === 0 ? 1 : -1) * steps(away, ZIPPER_SHIFT * cols), 0]);
+  }
+}
+
+/** The context with every bar moved by whole cells: `by(column, row)` gives the shift in columns and rows. */
+function shiftCells(ctx: Ctx2D, g: GridEdges, by: (column: number, row: number) => [number, number]): Ctx2D {
+  return placeRects(ctx, (x, y, bw, bh) => {
+    const c = g.col.get(x);
+    const r = g.row.get(y);
+    if (c === undefined || r === undefined) return [x, y, bw, bh];
+    const [dc, dr] = by(c, r);
+    const left = edge(g.xs, c + dc);
+    const top = edge(g.ys, r + dr);
+    return [left, top, edge(g.xs, c + dc + 1) - left, edge(g.ys, r + dr + 1) - top];
+  });
 }
 
 type Rect = [number, number, number, number];

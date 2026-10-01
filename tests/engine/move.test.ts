@@ -24,7 +24,7 @@ describe('ease', () => {
 });
 
 it('offers the stroke moves', () => {
-  expect(MOVE_IDS).toEqual(['off', 'depth', 'slide', 'sway', 'offset', 'step']);
+  expect(MOVE_IDS).toEqual(['off', 'depth', 'slide', 'step', 'rise', 'cascade', 'zipper']);
 });
 
 for (const move of MOVE_IDS.filter((m) => m !== 'off')) {
@@ -53,30 +53,34 @@ for (const move of MOVE_IDS.filter((m) => m !== 'off')) {
   });
 }
 
-describe('OFFSET and STEP move in whole grid steps', () => {
-  // Test grid: bars of 10 × 30 – every outline must sit on that grid, at full size, in every frame.
-  for (const move of ['offset', 'step'] as const) {
-    it(`${move.toUpperCase()} keeps every bar on the grid, corner on corner`, () => {
-      let moved = false;
+describe('grid moves stay on the grid', () => {
+  // Test grid: bars of 10 × 30 – every outline must sit on that grid, at full size, in every frame,
+  // so bars only ever meet corner on corner.
+  const cells = (rects: string[]) => rects.map((r) => r.split(' ').slice(1).map(Number));
+  for (const move of ['step', 'rise', 'cascade', 'zipper'] as const) {
+    it(`${move.toUpperCase()} keeps every bar on the grid and visibly moves it`, () => {
+      let farthest = 0;
       for (let t = 0.1; t < 6; t += 0.37) {
-        const still = record((ctx) => renderFrame(ctx, scene({}), t)).filter((c) => c.startsWith('rect '));
         const rects = record((ctx) => renderFrame(ctx, scene({ move }), t)).filter((c) => c.startsWith('rect '));
-        for (const r of rects) {
-          const [, x, y, w, h] = r.split(' ').map(Number);
+        const still = new Set(record((ctx) => renderFrame(ctx, scene({}), t)).filter((c) => c.startsWith('rect ')));
+        for (const [x, y, w, h] of cells(rects)) {
           expect([Math.abs(x % 10), Math.abs(y % 30), w, h]).toEqual([0, 0, 10, 30]); // bars may sit beyond the frame
         }
-        if ([...rects].sort().join() !== [...still].sort().join()) moved = true;
+        farthest = Math.max(farthest, rects.filter((r) => !still.has(r)).length / Math.max(1, rects.length));
       }
-      expect(moved).toBe(true);
+      expect(farthest).toBeGreaterThan(0.5); // at some point most visible bars are away from their place
     });
   }
 
-  it('OFFSET shifts whole columns up or down, STEP shifts the layer sideways', () => {
-    const at = (move: 'offset' | 'step') => record((ctx) => renderFrame(ctx, scene({ move }), 0.9)).filter((c) => c.startsWith('rect '));
+  it('STEP and ZIPPER shift sideways, RISE and CASCADE up and down', () => {
+    const at = (move: 'step' | 'rise' | 'cascade' | 'zipper') =>
+      record((ctx) => renderFrame(ctx, scene({ move }), 0.9)).filter((c) => c.startsWith('rect '));
     const still = record((ctx) => renderFrame(ctx, scene({}), 0.9)).filter((c) => c.startsWith('rect '));
     const xs = (rects: string[]) => rects.map((r) => r.split(' ')[1]).sort().join();
     const ys = (rects: string[]) => rects.map((r) => r.split(' ')[2]).sort().join();
-    expect(xs(at('offset'))).toBe(xs(still));
     expect(ys(at('step'))).toBe(ys(still));
+    expect(ys(at('zipper'))).toBe(ys(still));
+    expect(xs(at('rise'))).toBe(xs(still));
+    expect(xs(at('cascade'))).toBe(xs(still));
   });
 });
