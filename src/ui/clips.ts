@@ -1,5 +1,5 @@
 import { effect } from '../state/signal';
-import { images, playing, selected, shownClip } from '../state/store';
+import { images, playing, selected, settings, shownClip } from '../state/store';
 import { h } from './dom';
 import { moveImage, removeImage } from './images';
 
@@ -88,7 +88,7 @@ export function mountClips(root: HTMLElement, pickFiles: () => void): void {
     const list = images.get();
     const sel = selected.get();
     const hadFocus = root.contains(document.activeElement);
-    root.hidden = list.length === 0;
+    root.hidden = list.length === 0 || settings.get().mode !== 'photo';
     root.replaceChildren(
       ...list.map((img, i) => {
         const el = h('div', { class: 'clip', role: 'button', tabindex: 0, 'data-index': i, 'aria-label': `Image ${i + 1}: ${img.name}` },
@@ -113,6 +113,6 @@ export function mountClips(root: HTMLElement, pickFiles: () => void): void {
     if (hadFocus) root.querySelector<HTMLElement>(`.clip[data-index="${sel}"]`)?.focus();
   };
 
-  effect([images, selected, playing], render);
+  effect([images, selected, playing, settings], render);
   shownClip.subscribe(markCurrent);
 }

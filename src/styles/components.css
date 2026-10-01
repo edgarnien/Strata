@@ -237,7 +237,8 @@
   & :is(.btn, .color) { min-height: 34px; height: 34px; padding-block: 0; }
   & .stepper__btn { width: 30px; min-height: 30px; height: 30px; }
 }
-.sidebar__logo { font-weight: 700; letter-spacing: .14em; font-size: 13px; padding-bottom: calc(10px + var(--air) * .5); }
+.sidebar__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: calc(10px + var(--air) * .5); }
+.sidebar__logo { font-weight: 700; letter-spacing: .14em; font-size: 13px; }
 .group {
   display: flex;
   flex-direction: column;
@@ -389,6 +390,29 @@
 }
 .topbar { align-items: center; justify-content: space-between; padding: 8px 14px; }
 .logo { font-weight: 700; letter-spacing: .14em; font-size: 12px; }
+.topbar__end { display: flex; align-items: center; gap: 8px; }
+
+/* ---------- mode switch ---------- */
+.mode { display: inline-flex; padding: 2px; border-radius: var(--radius-pill); background: var(--surface-2); }
+.mode__btn {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: var(--text-2);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 6px 12px;
+  min-height: 30px;
+  cursor: pointer;
+}
+.mode__btn[aria-pressed="true"] { background: var(--text); color: #000; }
+.mode__btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.field__hint { font-size: var(--label); letter-spacing: .06em; color: var(--warn); }
+
+/* Hidden players for the video preview: in the DOM (iOS decodes them), never seen. */
+.video-host { position: fixed; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 
 /* ---------- empty state ---------- */
 .empty { display: flex; flex-direction: column; align-items: center; gap: 12px; }

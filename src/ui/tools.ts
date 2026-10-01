@@ -1,6 +1,8 @@
-import { colorLocked, images, type ToolId } from '../state/store';
+import { MODES, type Mode } from '../engine/types';
+import { colorLocked, cutCount, images, settings, type ToolId } from '../state/store';
 import {
-  colorControl, formatControl, imgMaskControl, loopsControl, motionControl, moveControl, removeControl, sliderControl,
+  audioControl, colorControl, dauerControl, formatControl, imgMaskControl, introOutroControl, loopsControl, motionControl,
+  moveControl, removeControl, sliderControl,
 } from './controls';
 
 export type GroupId = 'adjust' | 'background' | 'color' | 'motion' | 'format';
@@ -12,10 +14,15 @@ export interface ToolDef {
   icon: string;
   group: GroupId;
   build: () => HTMLElement;
+  /** Modes the tool belongs to (default: both). */
+  modes?: readonly Mode[];
   visible?: () => boolean;
   /** Greyed out in the toolbar while this returns true (the control locks itself). */
   locked?: () => boolean;
 }
+
+const PHOTO: readonly Mode[] = ['photo'];
+const VIDEO: readonly Mode[] = ['video'];
 
 /** Single source for the desktop sidebar and the mobile toolbar, in toolbar order. */
 export const TOOLS: readonly ToolDef[] = [
@@ -24,10 +31,20 @@ export const TOOLS: readonly ToolDef[] = [
   { id: 'threshold', label: 'Thresh.', icon: '◐', group: 'adjust', build: () => sliderControl({ label: 'THRESHOLD', key: 'threshold' }) },
   { id: 'remove', label: 'Remove', icon: '✂', group: 'background', build: removeControl },
   { id: 'color', label: 'Color', icon: '●', group: 'color', build: colorControl, locked: colorLocked },
-  { id: 'imgMask', label: 'Img Mask', icon: '◧', group: 'color', build: imgMaskControl, visible: () => images.get().length >= 2 },
+  {
+    id: 'imgMask', label: 'Img Mask', icon: '◧', group: 'color', build: imgMaskControl,
+    visible: () => (settings.get().mode === 'photo' ? images.get().length >= 2 : cutCount() >= 1),
+  },
+  { id: 'introOutro', label: 'Intro', icon: '⬒', group: 'motion', build: introOutroControl, modes: VIDEO },
   { id: 'motion', label: 'Motion', icon: '∿', group: 'motion', build: motionControl },
   { id: 'move', label: 'Move', icon: '⧉', group: 'motion', build: moveControl },
-  { id: 'speed', label: 'Speed', icon: '»', group: 'motion', build: () => sliderControl({ label: 'SPEED', key: 'speed', readout: (v) => `${v.toFixed(1)}×` }) },
-  { id: 'loops', label: 'Loops', icon: '⟳', group: 'motion', build: loopsControl },
+  { id: 'speed', label: 'Speed', icon: '»', group: 'motion', modes: PHOTO, build: () => sliderControl({ label: 'SPEED', key: 'speed', readout: (v) => `${v.toFixed(1)}×` }) },
+  { id: 'dauer', label: 'Duration', icon: '»', group: 'motion', build: dauerControl, modes: VIDEO },
+  { id: 'loops', label: 'Loops', icon: '⟳', group: 'motion', build: loopsControl, modes: PHOTO },
+  { id: 'audio', label: 'Sound', icon: '♪', group: 'motion', build: audioControl, modes: VIDEO },
   { id: 'format', label: 'Format', icon: '▯', group: 'format', build: formatControl },
 ];
+
+export function toolShown(tool: ToolDef): boolean {
+  return (tool.modes ?? MODES).includes(settings.get().mode) && (tool.visible?.() ?? true);
+}

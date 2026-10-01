@@ -3,7 +3,7 @@ import { videoExportSupported } from '../export/capability';
 import { exportPng } from '../export/image';
 import { canShare, downloadFile, exportFileName, shareFile } from '../export/save';
 import { ExportCancelled, exportVideo, type VideoJob } from '../export/video';
-import { exporting, images, playing, selected, settings } from '../state/store';
+import { exporting, hasContent, images, playing, selected, settings } from '../state/store';
 import { h } from './dom';
 import type { PreviewApi } from './preview';
 import { buildScene } from './scene';
@@ -178,7 +178,7 @@ export function mountExportDialog(dialog: HTMLDialogElement, preview: PreviewApi
 
   return {
     open() {
-      if (images.get().length === 0 || dialog.open) return;
+      if (!hasContent() || dialog.open) return;
       phase = { name: 'idle' };
       render();
       dialog.showModal();

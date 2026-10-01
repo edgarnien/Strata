@@ -1,7 +1,7 @@
 import { effect } from '../state/signal';
-import { activeTool, images, settings } from '../state/store';
+import { activeTool, images, markers, settings, videoClips } from '../state/store';
 import { h } from './dom';
-import { TOOLS } from './tools';
+import { TOOLS, toolShown } from './tools';
 
 /** Mobile: a scrollable icon bar; only the active tool's control is shown in the panel above it. */
 export function mountToolbar(bar: HTMLElement, panel: HTMLElement): void {
@@ -18,8 +18,8 @@ export function mountToolbar(bar: HTMLElement, panel: HTMLElement): void {
     bar.append(btn);
     panel.append(pane);
 
-    effect([activeTool, images, settings], () => {
-      const visible = tool.visible ? tool.visible() : true;
+    effect([activeTool, images, settings, videoClips, markers], () => {
+      const visible = toolShown(tool);
       if (!visible && activeTool.get() === tool.id) {
         activeTool.set('size');
         return;

@@ -2,10 +2,12 @@ import { FORMATS, outputSize, pixelLabel } from '../engine/formats';
 import { MOTIONS } from '../engine/motions';
 import { MOVES } from '../engine/move';
 import type { FormatId, MotionId, MoveId, Settings } from '../engine/types';
+import { dauerLimit } from '../engine/videoTimeline';
 import { RANGES, type RangeKey } from '../state/settings';
 import { effect } from '../state/signal';
-import { colorLocked, images, patchSettings, settings } from '../state/store';
+import { colorLocked, firstSourceSize, images, markers, patchSettings, settings, timelineInput, videoClips } from '../state/store';
 import { normalizeHex } from '../util/color';
+import { formatClock } from '../util/time';
 import { colorWheel } from './colorWheel';
 import { h } from './dom';
 import { dropdown } from './dropdown';
@@ -83,7 +85,7 @@ export function colorControl(): HTMLElement {
   });
   const hint = h('span', {});
   const field = h('div', { class: 'field' }, label('COLOR', hint), h('div', { class: 'color' }, swatch, input, pop));
-  effect([settings, images], () => {
+  effect([settings, images, videoClips, markers], () => {
     const locked = colorLocked();
     field.classList.toggle('is-disabled', locked);
     hint.textContent = locked ? 'OFF · IMG MASK' : '';
@@ -94,16 +96,40 @@ export function colorControl(): HTMLElement {
   return field;
 }
 
-export function imgMaskControl(): HTMLElement {
+type SwitchKey = 'imgMask' | 'intro' | 'outro' | 'audio';
+
+function switchField(text: string, key: SwitchKey): HTMLElement {
   const toggle = h('button', {
     class: 'switch',
     type: 'button',
     role: 'switch',
-    'aria-label': 'Img mask',
-    onclick: () => patchSettings({ imgMask: !settings.get().imgMask }),
+    'aria-label': text.toLowerCase(),
+    onclick: () => {
+      const patch: Partial<Settings> = {};
+      patch[key] = !settings.get()[key];
+      patchSettings(patch);
+    },
   });
-  effect([settings], () => toggle.setAttribute('aria-checked', String(settings.get().imgMask)));
-  return h('div', { class: 'field field--inline' }, label('IMG MASK'), toggle);
+  effect([settings], () => toggle.setAttribute('aria-checked', String(settings.get()[key])));
+  return h('div', { class: 'field field--inline' }, label(text), toggle);
+}
+
+export const imgMaskControl = (): HTMLElement => switchField('IMG MASK', 'imgMask');
+export const introOutroControl = (): HTMLElement => h('div', { class: 'field' }, switchField('INTRO', 'intro'), switchField('OUTRO', 'outro'));
+export const audioControl = (): HTMLElement => switchField('SOUND', 'audio');
+
+/** DURATION: one stroke phase in seconds, the same for every cut; says when a short shot caps it. */
+export function dauerControl(): HTMLElement {
+  const field = sliderControl({ label: 'DURATION', key: 'dauer', readout: (v) => `${v.toFixed(1)} s` });
+  const hint = h('p', { class: 'field__hint' });
+  effect([settings, videoClips, markers], () => {
+    const limit = dauerLimit(timelineInput());
+    const capped = settings.get().dauer > limit.max;
+    hint.hidden = !capped;
+    if (capped) hint.textContent = `MAX ${limit.max.toFixed(2)} S · SHORT SHOT AT ${formatClock(limit.axisAt ?? 0)}`;
+  });
+  field.append(hint);
+  return field;
 }
 
 export function motionControl(): HTMLElement {
@@ -131,11 +157,11 @@ export function formatControl(): HTMLElement {
   return dropdown<FormatId>({
     label: 'FORMAT',
     options: () => {
-      const first = images.get()[0]?.bitmap ?? null;
+      const first = firstSourceSize();
       return FORMATS.map((f) => ({ value: f.id, icon: f.icon, label: f.label, detail: pixelLabel(outputSize(f.id, first)) }));
     },
     value: () => settings.get().format,
     onSelect: (format) => patchSettings({ format }),
-    deps: [settings, images],
+    deps: [settings, images, videoClips],
   });
 }

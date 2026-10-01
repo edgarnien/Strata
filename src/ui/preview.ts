@@ -2,7 +2,6 @@ import { renderFrame, renderStill, sceneDuration, type Scene } from '../engine/r
 import { effect } from '../state/signal';
 import { images, playing, seed, selected, settings, shownClip } from '../state/store';
 import { h } from './dom';
-import { addImageFiles } from './images';
 import { buildScene } from './scene';
 
 export interface PreviewApi {
@@ -12,7 +11,7 @@ export interface PreviewApi {
 
 const PAD = 16;
 
-export function mountPreview(root: HTMLElement, pickFiles: () => void): PreviewApi {
+export function mountPreview(root: HTMLElement, pickFiles: () => void, addFiles: (files: File[]) => void, _videoHost: HTMLElement): PreviewApi {
   const canvas = root.querySelector('canvas');
   const ctx = canvas?.getContext('2d');
   if (!canvas || !ctx) throw new Error('#preview needs a <canvas>');
@@ -104,7 +103,7 @@ export function mountPreview(root: HTMLElement, pickFiles: () => void): PreviewA
   root.addEventListener('drop', (e) => {
     e.preventDefault();
     root.classList.remove('dragover');
-    if (e.dataTransfer?.files.length) void addImageFiles([...e.dataTransfer.files]);
+    if (e.dataTransfer?.files.length) addFiles([...e.dataTransfer.files]);
   });
 
   return { currentTime: () => lastT };
