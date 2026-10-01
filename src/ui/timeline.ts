@@ -125,6 +125,7 @@ export function mountTimeline(root: HTMLElement, pickFiles: () => void): void {
     const el = h('button', {
       class: `tl__marker${isSelected ? ' is-selected' : ''}`,
       type: 'button',
+      'data-id': m.id,
       style: `left: ${left}`,
       'aria-label': `Marker at ${formatClock(m.time)} in ${videoClips.get().find((c) => c.id === m.clipId)?.name ?? 'clip'}`,
     });
@@ -183,6 +184,9 @@ export function mountTimeline(root: HTMLElement, pickFiles: () => void): void {
     const sel = selectedMarker.get();
     const list = markers.get();
     const selected = list.find((m) => m.id === sel);
+    // Rebuilding the track destroys the focused marker; remember it so keyboard nudging can continue.
+    const active = document.activeElement;
+    const focusedId = active instanceof HTMLElement && track.contains(active) ? active.closest<HTMLElement>('.tl__marker')?.dataset.id : undefined;
     const children: (HTMLElement | null)[] = [
       ...clips.map((c, i) => h('div', {
         class: `tl__clip${c.id === selectedClip ? ' is-selected' : ''}`,
@@ -221,6 +225,7 @@ export function mountTimeline(root: HTMLElement, pickFiles: () => void): void {
       head,
     ];
     track.replaceChildren(...children.filter((el): el is HTMLElement => el !== null));
+    if (focusedId) track.querySelector<HTMLElement>(`.tl__marker[data-id="${focusedId}"]`)?.focus();
     placeHead();
   };
 
