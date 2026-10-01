@@ -1,9 +1,9 @@
 import type { PixelData } from './analyze';
 import { drawFitted } from './draw';
-import type { Fit, Size } from './types';
+import type { DrawSource, Fit, Size } from './types';
 
 /** Draws the image the way the output frame shows it and returns its pixels. */
-export function rasterize(img: ImageBitmap, size: Size, fit: Fit): PixelData {
+export function rasterize(img: DrawSource, size: Size, fit: Fit): PixelData {
   const canvas = new OffscreenCanvas(size.width, size.height);
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('2D canvas is not available.');

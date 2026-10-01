@@ -1,24 +1,32 @@
-import type { Bar, Ctx2D, Fit } from './types';
+import type { Bar, Ctx2D, DrawSource, Fit, Size } from './types';
 
 export const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 
-export function drawFitted(ctx: Ctx2D, img: ImageBitmap, width: number, height: number, fit: Fit): void {
+/** Pixel size of a source; a <video> element's own width/height are its layout box, not the video. */
+export function sourceSize(src: DrawSource): Size {
+  if ('videoWidth' in src) return { width: src.videoWidth, height: src.videoHeight };
+  if ('displayWidth' in src) return { width: src.displayWidth, height: src.displayHeight };
+  return { width: src.width, height: src.height };
+}
+
+export function drawFitted(ctx: Ctx2D, img: DrawSource, width: number, height: number, fit: Fit): void {
+  const { width: iw, height: ih } = sourceSize(img);
   if (fit === 'contain') {
-    const scale = Math.min(width / img.width, height / img.height);
-    const w = img.width * scale;
-    const h = img.height * scale;
+    const scale = Math.min(width / iw, height / ih);
+    const w = iw * scale;
+    const h = ih * scale;
     ctx.drawImage(img, (width - w) / 2, (height - h) / 2, w, h);
     return;
   }
-  const imgAspect = img.width / img.height;
+  const imgAspect = iw / ih;
   const targetAspect = width / height;
-  let sw = img.width, sh = img.height, sx = 0, sy = 0;
+  let sw = iw, sh = ih, sx = 0, sy = 0;
   if (imgAspect > targetAspect) {
-    sw = img.height * targetAspect;
-    sx = (img.width - sw) / 2;
+    sw = ih * targetAspect;
+    sx = (iw - sw) / 2;
   } else {
-    sh = img.width / targetAspect;
-    sy = (img.height - sh) / 2;
+    sh = iw / targetAspect;
+    sy = (ih - sh) / 2;
   }
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, width, height);
 }
@@ -39,7 +47,7 @@ export function fillBars(ctx: Ctx2D, bars: readonly Bar[], color: string, count 
 }
 
 /** Draws `img` only inside the union of `bars` (IMG MASK reveal). */
-export function clipDraw(ctx: Ctx2D, bars: readonly Bar[], img: ImageBitmap, width: number, height: number, fit: Fit): void {
+export function clipDraw(ctx: Ctx2D, bars: readonly Bar[], img: DrawSource, width: number, height: number, fit: Fit): void {
   if (bars.length === 0) return;
   ctx.save();
   ctx.beginPath();
@@ -50,7 +58,7 @@ export function clipDraw(ctx: Ctx2D, bars: readonly Bar[], img: ImageBitmap, wid
 }
 
 /** Draws `img` inside one bar at the given opacity. */
-export function drawInBar(ctx: Ctx2D, bar: Bar, img: ImageBitmap, width: number, height: number, fit: Fit, alpha: number): void {
+export function drawInBar(ctx: Ctx2D, bar: Bar, img: DrawSource, width: number, height: number, fit: Fit, alpha: number): void {
   ctx.save();
   ctx.beginPath();
   ctx.rect(bar.x, bar.y, bar.width, bar.height);

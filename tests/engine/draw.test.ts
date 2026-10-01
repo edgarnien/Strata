@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { barNoise, clipDraw, drawFitted, fillBars } from '../../src/engine/draw';
+import { barNoise, clipDraw, drawFitted, fillBars, sourceSize } from '../../src/engine/draw';
+import type { DrawSource } from '../../src/engine/types';
 import { fakeImage, record, testBars } from './helpers';
+
+describe('sourceSize', () => {
+  it('reads a video element by its intrinsic size and a video frame by its display size', () => {
+    expect(sourceSize({ videoWidth: 1920, videoHeight: 1080, width: 0, height: 0 } as unknown as DrawSource)).toEqual({ width: 1920, height: 1080 });
+    expect(sourceSize({ displayWidth: 1080, displayHeight: 1920, codedWidth: 1920 } as unknown as DrawSource)).toEqual({ width: 1080, height: 1920 });
+    expect(sourceSize(fakeImage('a', 200, 100))).toEqual({ width: 200, height: 100 });
+  });
+  it('drawFitted crops a video by its intrinsic size, not its element size', () => {
+    const video = { id: 'v', videoWidth: 200, videoHeight: 100, width: 0, height: 0 } as unknown as DrawSource;
+    expect(record((ctx) => drawFitted(ctx, video, 100, 100, 'cover'))).toEqual([
+      'drawImage v 50.00 0.00 100.00 100.00 0.00 0.00 100.00 100.00 1.000',
+    ]);
+  });
+});
 
 describe('drawFitted', () => {
   it('cover crops the wider source to the target aspect, centred', () => {
