@@ -13,6 +13,12 @@ export type MotionId = (typeof MOTION_IDS)[number];
 export const MOVE_IDS = ['off', 'depth', 'slide', 'step', 'cascade', 'zipper', 'comb'] as const;
 export type MoveId = (typeof MOVE_IDS)[number];
 
+export const MODES = ['photo', 'video'] as const;
+export type Mode = (typeof MODES)[number];
+
+/** Anything the renderer can draw: a photo, a playing <video>, a decoded video frame or a canvas. */
+export type DrawSource = ImageBitmap | HTMLVideoElement | VideoFrame | HTMLCanvasElement | OffscreenCanvas;
+
 export interface Size {
   width: number;
   height: number;
@@ -39,4 +45,13 @@ export interface Settings {
   loops: number;
   format: FormatId;
   move: MoveId;
+  mode: Mode;
+  /** Video: length of one stroke phase (building up or falling away), in seconds. */
+  dauer: number;
+  /** Video: the first shot starts covered and the strokes fall away. */
+  intro: boolean;
+  /** Video: the strokes build up and cover the last frame. */
+  outro: boolean;
+  /** Video: keep the clips' sound. */
+  audio: boolean;
 }

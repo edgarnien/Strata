@@ -58,3 +58,20 @@ describe('MOVE settings', () => {
     expect(parseSettings({ move: 'slide', moveStrokes: true })).not.toHaveProperty('moveStrokes');
   });
 });
+
+describe('video settings', () => {
+  it('defaults to photo mode with 0.6 s, intro, outro and sound on', () => {
+    expect(DEFAULT_SETTINGS).toMatchObject({ mode: 'photo', dauer: 0.6, intro: true, outro: true, audio: true });
+  });
+  it('keeps valid video values and snaps DURATION to 0.1 s without float noise', () => {
+    const parsed = parseSettings({ mode: 'video', dauer: 0.63, intro: false, outro: true, audio: false });
+    expect(parsed).toMatchObject({ mode: 'video', dauer: 0.6, intro: false, outro: true, audio: false });
+    expect(parseSettings({ dauer: 0.7 }).dauer).toBe(0.7);
+  });
+  it('replaces unknown modes and out-of-range durations', () => {
+    expect(parseSettings({ mode: 'audio', dauer: 3 })).toMatchObject({ mode: 'photo', dauer: 0.6 });
+  });
+  it('fills the new fields when stored settings predate them', () => {
+    expect(parseSettings({ size: 40 })).toMatchObject({ size: 40, mode: 'photo', intro: true, outro: true, audio: true });
+  });
+});

@@ -1,4 +1,4 @@
-import { FORMAT_IDS, MOTION_IDS, MOVE_IDS, type Settings } from '../engine/types';
+import { FORMAT_IDS, MODES, MOTION_IDS, MOVE_IDS, type Settings } from '../engine/types';
 import { normalizeHex } from '../util/color';
 
 export const STORAGE_KEY = 'strata:v2';
@@ -16,9 +16,14 @@ export const DEFAULT_SETTINGS: Settings = {
   loops: 2,
   format: '9:16',
   move: 'off',
+  mode: 'photo',
+  dauer: 0.6,
+  intro: true,
+  outro: true,
+  audio: true,
 };
 
-export type RangeKey = 'size' | 'stretch' | 'threshold' | 'sensitivity' | 'speed' | 'loops';
+export type RangeKey = 'size' | 'stretch' | 'threshold' | 'sensitivity' | 'speed' | 'loops' | 'dauer';
 
 export const RANGES: Record<RangeKey, { min: number; max: number; step: number }> = {
   size: { min: 25, max: 100, step: 1 },
@@ -27,6 +32,7 @@ export const RANGES: Record<RangeKey, { min: number; max: number; step: number }
   sensitivity: { min: 10, max: 100, step: 1 },
   speed: { min: 0.5, max: 10, step: 0.5 },
   loops: { min: 1, max: 10, step: 1 },
+  dauer: { min: 0.2, max: 1.5, step: 0.1 },
 };
 
 export function parseSettings(raw: unknown): Settings {
@@ -36,9 +42,11 @@ export function parseSettings(raw: unknown): Settings {
     const v = r[key];
     const { min, max, step } = RANGES[key];
     if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max) return d[key];
-    return Math.round(v / step) * step;
+    // toFixed: 7 × 0.1 is 0.7000000000000001
+    return Number((Math.round(v / step) * step).toFixed(4));
   };
-  const bool = (key: 'removeFront' | 'imgMask'): boolean => (typeof r[key] === 'boolean' ? (r[key] as boolean) : d[key]);
+  const bool = (key: 'removeFront' | 'imgMask' | 'intro' | 'outro' | 'audio'): boolean =>
+    (typeof r[key] === 'boolean' ? (r[key] as boolean) : d[key]);
   const oneOf = <T extends string>(v: unknown, options: readonly T[], fallback: T): T =>
     (options as readonly unknown[]).includes(v) ? (v as T) : fallback;
 
@@ -55,6 +63,11 @@ export function parseSettings(raw: unknown): Settings {
     loops: ranged('loops'),
     format: oneOf(r.format, FORMAT_IDS, d.format),
     move: oneOf(r.move, MOVE_IDS, d.move),
+    mode: oneOf(r.mode, MODES, d.mode),
+    dauer: ranged('dauer'),
+    intro: bool('intro'),
+    outro: bool('outro'),
+    audio: bool('audio'),
   };
 }
 
