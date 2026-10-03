@@ -1,7 +1,7 @@
 import { effect } from '../state/signal';
 import { activeTool, images, markers, settings, videoClips } from '../state/store';
 import { h } from './dom';
-import { TOOLS, toolShown } from './tools';
+import { TOOLS, applyLock, toolShown } from './tools';
 
 /** Mobile: a scrollable icon bar; only the active tool's control is shown in the panel above it. */
 export function mountToolbar(bar: HTMLElement, panel: HTMLElement): void {
@@ -27,6 +27,7 @@ export function mountToolbar(bar: HTMLElement, panel: HTMLElement): void {
       const active = visible && activeTool.get() === tool.id;
       btn.hidden = !visible;
       btn.classList.toggle('is-locked', tool.locked?.() ?? false);
+      applyLock(tool, pane);
       btn.classList.toggle('is-active', active);
       btn.setAttribute('aria-pressed', String(active));
       pane.hidden = !active;

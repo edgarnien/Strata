@@ -117,9 +117,9 @@ export function mountPreview(root: HTMLElement, pickFiles: () => void, addFiles:
       lastT = null;
       return;
     }
-    // Render in output coordinates, scaled down to the preview size.
-    const k = canvas.width / size.width;
-    ctx.setTransform(k, 0, 0, k, 0, 0);
+    // Render in output coordinates, scaled down to the preview size. Each axis scales on its own:
+    // the canvas is rounded to whole pixels, and one factor for both left an empty row at the bottom.
+    ctx.setTransform(canvas.width / size.width, 0, 0, canvas.height / size.height, 0, 0);
     const again = isVideo() ? drawVideo(now) : drawPhoto(now);
     if (again && !raf) raf = requestAnimationFrame(draw);
   };

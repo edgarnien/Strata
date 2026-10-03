@@ -250,6 +250,20 @@ export function mountTimeline(root: HTMLElement, pickFiles: () => void): void {
     placeHead();
   };
 
+  // A click anywhere outside the timeline, or Esc, lets go of the selected clip and marker.
+  const deselect = () => {
+    if (selectedClip === null && selectedMarker.get() === null) return;
+    selectedClip = null;
+    selectedMarker.set(null);
+    render();
+  };
+  document.addEventListener('pointerdown', (e) => {
+    if (!root.contains(e.target as Node)) deselect();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') deselect();
+  });
+
   effect([settings, videoClips, markers, selectedMarker], render);
   new ResizeObserver(fillStrips).observe(track);
   playhead.subscribe(placeHead);

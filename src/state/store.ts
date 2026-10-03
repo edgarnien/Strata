@@ -1,7 +1,7 @@
 import { imgMaskOn } from '../engine/render';
 import { randomSeed } from '../engine/rng';
 import type { Settings, Size } from '../engine/types';
-import { shotSpans, type Marker, type VideoTimelineInput } from '../engine/videoTimeline';
+import type { Marker, VideoTimelineInput } from '../engine/videoTimeline';
 import { loadSettings, saveSettings } from './settings';
 import { signal } from './signal';
 
@@ -57,15 +57,11 @@ export function timelineInput(s: Settings = settings.get()): VideoTimelineInput 
     clips: videoClips.get().map((c) => ({ id: c.id, duration: c.duration })),
     markers: markers.get(),
     dauer: s.dauer,
-    imgMask: s.imgMask,
+    // IMG MASK only pairs photos; between video clips its look is too busy.
+    imgMask: false,
     intro: s.intro,
     outro: s.outro,
   };
-}
-
-/** Cuts in video mode: clip boundaries plus markers. */
-export function cutCount(): number {
-  return Math.max(0, shotSpans(timelineInput()).length - 1);
 }
 
 /** Whether the active mode has anything to show. */
@@ -80,14 +76,14 @@ export function firstSourceSize(): Size | null {
   return clip ? { width: clip.width, height: clip.height } : null;
 }
 
-/**
- * IMG MASK reveals the next clip instead of drawing strokes, so the stroke colour has no say –
- * unless a video intro or outro still draws colour strokes.
- */
+/** IMG MASK reveals the next clip instead of drawing strokes, so the stroke colour has no say. */
 export function colorLocked(): boolean {
   const s = settings.get();
-  if (s.mode === 'photo') return imgMaskOn(s, images.get().length);
-  return s.imgMask && cutCount() >= 1 && !s.intro && !s.outro;
+  return s.mode === 'photo' && imgMaskOn(s, images.get().length);
+}
+
+export function videoMode(): boolean {
+  return settings.get().mode === 'video';
 }
 
 export function patchSettings(patch: Partial<Settings>): void {

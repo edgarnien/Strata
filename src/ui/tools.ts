@@ -1,5 +1,5 @@
 import { MODES, type Mode } from '../engine/types';
-import { colorLocked, cutCount, images, settings, type ToolId } from '../state/store';
+import { colorLocked, images, settings, videoMode, type ToolId } from '../state/store';
 import {
   audioControl, colorControl, dauerControl, formatControl, imgMaskControl, introOutroControl, loopsControl, motionControl,
   moveControl, removeControl, sliderControl,
@@ -17,7 +17,7 @@ export interface ToolDef {
   /** Modes the tool belongs to (default: both). */
   modes?: readonly Mode[];
   visible?: () => boolean;
-  /** Greyed out in the toolbar while this returns true (the control locks itself). */
+  /** Greyed out and inert while this returns true. */
   locked?: () => boolean;
 }
 
@@ -28,13 +28,10 @@ const VIDEO: readonly Mode[] = ['video'];
 export const TOOLS: readonly ToolDef[] = [
   { id: 'size', label: 'Size', icon: '▣', group: 'adjust', build: () => sliderControl({ label: 'SIZE', key: 'size' }) },
   { id: 'stretch', label: 'Stretch', icon: '↔', group: 'adjust', build: () => sliderControl({ label: 'STRETCH', key: 'stretch' }) },
-  { id: 'threshold', label: 'Thresh.', icon: '◐', group: 'adjust', build: () => sliderControl({ label: 'THRESHOLD', key: 'threshold' }) },
-  { id: 'remove', label: 'Remove', icon: '✂', group: 'background', build: removeControl },
+  { id: 'threshold', label: 'Thresh.', icon: '◐', group: 'adjust', build: () => sliderControl({ label: 'THRESHOLD', key: 'threshold' }), locked: videoMode },
+  { id: 'remove', label: 'Remove', icon: '✂', group: 'background', build: removeControl, locked: videoMode },
   { id: 'color', label: 'Color', icon: '●', group: 'color', build: colorControl, locked: colorLocked },
-  {
-    id: 'imgMask', label: 'Img Mask', icon: '◧', group: 'color', build: imgMaskControl,
-    visible: () => (settings.get().mode === 'photo' ? images.get().length >= 2 : cutCount() >= 1),
-  },
+  { id: 'imgMask', label: 'Img Mask', icon: '◧', group: 'color', build: imgMaskControl, modes: PHOTO, visible: () => images.get().length >= 2 },
   { id: 'introOutro', label: 'Intro', icon: '⬒', group: 'motion', build: introOutroControl, modes: VIDEO },
   { id: 'motion', label: 'Motion', icon: '∿', group: 'motion', build: motionControl },
   { id: 'move', label: 'Move', icon: '⧉', group: 'motion', build: moveControl },
@@ -44,6 +41,13 @@ export const TOOLS: readonly ToolDef[] = [
   { id: 'audio', label: 'Sound', icon: '♪', group: 'motion', build: audioControl, modes: VIDEO },
   { id: 'format', label: 'Format', icon: '▯', group: 'format', build: formatControl },
 ];
+
+/** Greys a tool's control out and takes it out of reach while the tool is locked. */
+export function applyLock(tool: ToolDef, el: HTMLElement): void {
+  const locked = tool.locked?.() ?? false;
+  el.classList.toggle('is-disabled', locked);
+  el.inert = locked;
+}
 
 export function toolShown(tool: ToolDef): boolean {
   return (tool.modes ?? MODES).includes(settings.get().mode) && (tool.visible?.() ?? true);

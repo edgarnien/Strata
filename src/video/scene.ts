@@ -4,6 +4,7 @@ import { lookFrames, type FrameRef, type VideoLooks, type VideoProjectScene } fr
 import type { BarLook } from '../engine/strokes';
 import { layout } from '../engine/videoTimeline';
 import { effect, signal } from '../state/signal';
+import { DEFAULT_SETTINGS } from '../state/settings';
 import { markers, seed, settings, timelineInput, videoClips } from '../state/store';
 import { toast } from '../ui/toast';
 import { frameAt } from './media';
@@ -21,6 +22,10 @@ export async function buildVideoScene(): Promise<VideoProjectScene | null> {
   const size = outputSize(s.format, { width: clips[0].width, height: clips[0].height });
   if (!size) return null;
   const fit = fitFor(s.format);
+  // THRESHOLD and REMOVE are greyed out in video mode: the strokes cover the whole frame at every
+  // cut anyway, so the looks only set the order the bars come in – read with the standard values.
+  const { threshold, removeFront, sensitivity } = DEFAULT_SETTINGS;
+  const analysis = { ...s, threshold, removeFront, sensitivity };
   const lay = layout(timelineInput(s));
   const frames = lookFrames(lay);
   const used = new Set<string>();
@@ -28,7 +33,7 @@ export async function buildVideoScene(): Promise<VideoProjectScene | null> {
     const key = keyOf(f);
     used.add(key);
     const source = cache.needsPixels(key, size, fit) ? await frameAt(f.clipId, f.time, size, fit) : null;
-    return cache.look(key, source, size, fit, s);
+    return cache.look(key, source, size, fit, analysis);
   };
   const looks: VideoLooks = {
     intro: frames.intro && (await look(frames.intro)),
