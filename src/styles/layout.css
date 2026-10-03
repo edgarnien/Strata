@@ -56,9 +56,13 @@ body {
     grid-template-rows: auto minmax(0, 1fr) auto auto;
     grid-template-areas: "topbar" "stage" "panel" "toolbar";
     padding-top: env(safe-area-inset-top);
+    /* Space for the home indicator outside the scrolling toolbar, so a sideways swipe over the
+       tools never starts the system's home gesture. */
+    padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
   }
   .sidebar { display: none; }
   .topbar { grid-area: topbar; display: flex; }
   .panel { grid-area: panel; display: block; }
-  .toolbar { grid-area: toolbar; display: flex; padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  /* The shadow paints the toolbar colour down over the space below, which takes no touches. */
+  .toolbar { grid-area: toolbar; display: flex; box-shadow: 0 calc(env(safe-area-inset-bottom) + 12px) 0 var(--surface); }
 }
