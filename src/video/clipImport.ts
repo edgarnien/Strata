@@ -17,8 +17,8 @@ export async function addVideoFiles(files: Iterable<File>): Promise<void> {
     const id = `vid${++nextId}`;
     try {
       const probe = await openClip(id, file);
-      const stripUrl = await filmstrip(id, probe.duration);
-      added.push({ id, name: file.name, file, url: URL.createObjectURL(file), stripUrl, ...probe });
+      const strip = await filmstrip(id, probe.duration);
+      added.push({ id, name: file.name, file, url: URL.createObjectURL(file), stripUrl: strip.url, stripFrames: strip.frames, ...probe });
     } catch (err) {
       closeClip(id);
       toast(`${file.name} ${err instanceof ClipError ? err.message : 'could not be loaded'}`, 'error');

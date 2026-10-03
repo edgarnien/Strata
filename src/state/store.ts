@@ -26,6 +26,8 @@ export interface VideoClipEntry {
   hasAudio: boolean;
   /** Object URL of a strip of small frames for the timeline. */
   stripUrl: string;
+  /** How many frames the strip holds, side by side at the clip's aspect. */
+  stripFrames: number;
 }
 
 export type ToolId =

@@ -58,8 +58,14 @@ export async function frameAt(id: string, time: number, size: Size, fit: Fit): P
 const STRIP_HEIGHT = 96;
 const STRIP_MAX_FRAMES = 40;
 
+export interface Filmstrip {
+  /** Object URL of the frames side by side. */
+  url: string;
+  frames: number;
+}
+
 /** One small frame per second of the clip side by side, as an object URL for the timeline. */
-export async function filmstrip(id: string, duration: number): Promise<string> {
+export async function filmstrip(id: string, duration: number): Promise<Filmstrip> {
   const m = media.get(id);
   if (!m) throw new Error(`Clip ${id} is not open`);
   const ratio = (await m.video.getDisplayWidth()) / (await m.video.getDisplayHeight());
@@ -75,7 +81,7 @@ export async function filmstrip(id: string, duration: number): Promise<string> {
     if (frame) ctx.drawImage(frame.canvas, i * w, 0);
     i++;
   }
-  return URL.createObjectURL(await strip.convertToBlob({ type: 'image/jpeg', quality: 0.7 }));
+  return { url: URL.createObjectURL(await strip.convertToBlob({ type: 'image/jpeg', quality: 0.7 })), frames: count };
 }
 
 export function closeClip(id: string): void {

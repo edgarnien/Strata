@@ -7,6 +7,7 @@ import { renderVideoFrame, videoPosition, type VideoProjectScene } from '../engi
 import { frameCount } from '../engine/timeline';
 import type { VideoFramePosition } from '../engine/videoTimeline';
 import { MIX_RATE, addShotSound, createMix, planarSlice, shotGain, type SoundChunk, type Stereo } from './audioMix';
+import { decodeErrorMessage } from './decodeError';
 import type { ClipFile, FromWorker } from './protocol';
 
 export interface EncodeHooks {
@@ -27,7 +28,7 @@ async function decoding<T>(name: string, step: () => Promise<T>): Promise<T> {
     return await step();
   } catch (err) {
     if (err instanceof EncodeCancelled) throw err;
-    throw new Error(`${name} could not be decoded: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(decodeErrorMessage(name, err));
   }
 }
 

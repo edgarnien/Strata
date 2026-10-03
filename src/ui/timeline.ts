@@ -1,13 +1,14 @@
 import { motionById } from '../engine/motions';
 import {
-  axisLength, clipAt, clipOffsets, layout, outputTimeOf, validMarkerTime, videoPositionAt, type Marker,
+  axisLength, clipAt, clipOffsets, layout, outputTimeOf, strokeSpans, validMarkerTime, videoPositionAt, type Marker,
 } from '../engine/videoTimeline';
 import { effect } from '../state/signal';
-import { markers, playhead, playing, selectedMarker, settings, timelineInput, videoClips } from '../state/store';
+import { markers, playhead, playing, selectedMarker, settings, timelineInput, videoClips, type VideoClipEntry } from '../state/store';
 import { formatClock } from '../util/time';
 import { removeVideoClip, moveVideoClip } from '../video/clipImport';
 import { addMarker, moveMarker, removeMarker } from '../video/markers';
 import { h } from './dom';
+import { stripTiles } from './filmstrip';
 import { toast } from './toast';
 
 const LONG_PRESS_MS = 300;
@@ -15,7 +16,7 @@ const FRAME = 1 / 30;
 
 /**
  * Video timeline: clips back to back by length, cuts as filled diamonds, markers as open ones
- * (drag to move, tap to select, × or Delete to remove), the playhead to scrub, intro / outro shaded.
+ * (drag to move, tap to select, × or Delete to remove), the playhead to scrub, where strokes sit hatched.
  * A long press on a clip drags it to a new place.
  */
 export function mountTimeline(root: HTMLElement, pickFiles: () => void): void {
@@ -174,6 +175,26 @@ export function mountTimeline(root: HTMLElement, pickFiles: () => void): void {
     return el;
   };
 
+  /** Frames at their own aspect, as many as fit the clip's current width. */
+  const fillStrip = (strip: HTMLElement, c: VideoClipEntry) => {
+    const { width, height } = strip.getBoundingClientRect();
+    if (width === 0 || height === 0) return;
+    const t = stripTiles(width, height, c.stripFrames, c.width / c.height);
+    const last = Math.max(1, c.stripFrames - 1);
+    strip.replaceChildren(...t.frames.map((f) => h('span', {
+      class: 'tl__tile',
+      style: `width: ${t.tileWidth}px; background-image: url("${c.stripUrl}"); background-size: ${t.tileWidth * c.stripFrames}px 100%; background-position-x: ${(f / last) * 100}%`,
+    })));
+  };
+  const fillStrips = () => {
+    const clips = videoClips.get();
+    track.querySelectorAll<HTMLElement>('.tl__clip').forEach((el) => {
+      const c = clips.find((x) => x.id === el.dataset.id);
+      const strip = el.querySelector<HTMLElement>('.tl__strip');
+      if (c && strip) fillStrip(strip, c);
+    });
+  };
+
   const render = () => {
     if (dragging) return;
     const clips = videoClips.get();
@@ -194,7 +215,7 @@ export function mountTimeline(root: HTMLElement, pickFiles: () => void): void {
         'data-id': c.id,
         style: `flex-grow: ${c.duration}`,
       },
-      h('img', { src: c.stripUrl, alt: '', draggable: 'false' }),
+      h('div', { class: 'tl__strip' }),
       c.id === selectedClip
         ? h('button', {
           class: 'tl__remove',
@@ -207,8 +228,7 @@ export function mountTimeline(root: HTMLElement, pickFiles: () => void): void {
         }, '×')
         : null)),
       ...clips.slice(1).map((c) => h('span', { class: 'tl__cut', style: `left: ${pct(offsets.get(c.id) ?? 0)}` })),
-      l.intro ? h('span', { class: 'tl__edge', style: `left: 0; width: ${pct(l.dauer)}` }) : null,
-      l.outro ? h('span', { class: 'tl__edge', style: `right: 0; width: ${pct(l.dauer)}` }) : null,
+      ...strokeSpans(l, clips).map((s) => h('span', { class: 'tl__strokes', style: `left: ${pct(s.from)}; width: ${pct(s.to - s.from)}` })),
       ...list.map((m) => markerEl(m, pct((offsets.get(m.clipId) ?? 0) + m.time), m.id === sel)),
       selected
         ? h('button', {
@@ -226,9 +246,11 @@ export function mountTimeline(root: HTMLElement, pickFiles: () => void): void {
     ];
     track.replaceChildren(...children.filter((el): el is HTMLElement => el !== null));
     if (focusedId) track.querySelector<HTMLElement>(`.tl__marker[data-id="${focusedId}"]`)?.focus();
+    fillStrips();
     placeHead();
   };
 
   effect([settings, videoClips, markers, selectedMarker], render);
+  new ResizeObserver(fillStrips).observe(track);
   playhead.subscribe(placeHead);
 }
