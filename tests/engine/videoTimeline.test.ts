@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  axisLength, clipAt, dauerLimit, layout, outputTimeOf, shotSpans, validMarkerTime, videoPositionAt, type VideoTimelineInput,
+  axisLength, clipAt, dauerLimit, layout, outputTimeOf, shotSpans, strokeSpans, validMarkerTime, videoPositionAt, type VideoTimelineInput,
 } from '../../src/engine/videoTimeline';
 
 const clip = (id: string, duration: number) => ({ id, duration });
@@ -159,5 +159,24 @@ describe('videoPositionAt – intro and outro', () => {
     expect(videoPositionAt(last, lay, 'middle')).toMatchObject({ phase: 'outro', side: 'before', progress: 0.5, cycle: 1 });
     expect(videoPositionAt(last - 0.25, lay, 'middle').progress).toBeCloseTo(0.25, 9);
     expect(videoPositionAt(2, lay, 'middle').phase).toBe('none');
+  });
+});
+
+describe('strokeSpans', () => {
+  it('marks where strokes sit on the clip axis: intro, each cut ± D, outro', () => {
+    const spans = strokeSpans(layout(input({ intro: true, outro: true })), [clip('a', 3), clip('b', 2)]);
+    expect(spans).toEqual([
+      { from: 0, to: 0.5 },
+      { from: 2.5, to: 3.5 },
+      { from: 4.5, to: 5 },
+    ]);
+  });
+  it('covers both overlapping stretches (± 2 · D) around a cut with IMG MASK', () => {
+    const spans = strokeSpans(layout(input({ imgMask: true })), [clip('a', 3), clip('b', 2)]);
+    expect(spans).toEqual([{ from: 2, to: 4 }]);
+  });
+  it('places marker cuts inside a clip and clamps to the axis', () => {
+    const spans = strokeSpans(layout(input({ clips: [clip('a', 6)], markers: [mk('a', 2)] })), [clip('a', 6)]);
+    expect(spans).toEqual([{ from: 1.5, to: 2.5 }]);
   });
 });

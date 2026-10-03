@@ -269,3 +269,27 @@ export function videoPositionAt(t: number, lay: Layout, covered: 'middle' | 'end
   if (lay.outro && tt >= last - dauer) return at('outro', Math.min(0, (tt - last) / w), 'before', -1, shots.length);
   return { shot, next: null, phase: 'none', transitionIndex: -1, side: 'before', progress: 0, cycle: 0, frameIndex };
 }
+
+export interface AxisSpan {
+  from: number;
+  to: number;
+}
+
+/**
+ * Where strokes sit on the clip axis, for the timeline: the intro, each cut ± D (± 2 · D with
+ * IMG MASK, which shows the stretches either side of the cut at once) and the outro.
+ */
+export function strokeSpans(lay: Layout, clips: readonly TimelineClip[]): AxisSpan[] {
+  const length = axisLength(clips);
+  const offsets = clipOffsets(clips);
+  const half = lay.imgMask ? 2 * lay.dauer : lay.dauer;
+  const span = (from: number, to: number): AxisSpan => ({ from: Math.max(0, from), to: Math.min(length, to) });
+  const spans: AxisSpan[] = [];
+  if (lay.intro && lay.shots.length) spans.push(span(0, lay.dauer));
+  for (const shot of lay.shots.slice(1)) {
+    const cut = (offsets.get(shot.clipId) ?? 0) + shot.sourceStart;
+    spans.push(span(cut - half, cut + half));
+  }
+  if (lay.outro && lay.shots.length) spans.push(span(length - lay.dauer, length));
+  return spans;
+}
