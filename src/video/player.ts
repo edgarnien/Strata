@@ -3,8 +3,13 @@ import type { Layout, VideoFramePosition } from '../engine/videoTimeline';
 import { videoClips } from '../state/store';
 import { toast } from '../ui/toast';
 
-/** Seek once a playing video drifts this far from the timeline (s). */
-const DRIFT = 0.1;
+/** The shown shot's video sets the clock, so it only seeks after a jump this large (s). */
+const LEAD_DRIFT = 0.5;
+/** Any other playing video catches up by its rate; it seeks only when this far off (s). */
+const FOLLOW_DRIFT = 1;
+/** Rate change per second of drift while catching up, and the most it may change. */
+const CATCH_UP = 2;
+const MAX_RATE_SHIFT = 0.5;
 /** Line up the next clip this long before it shows (s). */
 const PRELOAD = 1.5;
 /** A paused video counts as in place within half a frame. */
@@ -14,6 +19,8 @@ interface Want {
   time: number;
   gain: number;
   play: boolean;
+  /** The shot that fills the frame: its video leads the clock while playing. */
+  lead: boolean;
 }
 
 /**
@@ -38,10 +45,10 @@ export class VideoPlayer {
       const el = this.el(clipId, lane);
       if (el && !want.has(el)) want.set(el, w);
     };
-    put(pos.shot.clipId, pos.shot.lane, { time: pos.shot.sourceTime, gain: pos.next ? 1 - pos.progress : 1, play: playing });
-    if (pos.next) put(pos.next.clipId, pos.next.lane, { time: pos.next.sourceTime, gain: pos.progress, play: playing });
+    put(pos.shot.clipId, pos.shot.lane, { time: pos.shot.sourceTime, gain: pos.next ? 1 - pos.progress : 1, play: playing, lead: true });
+    if (pos.next) put(pos.next.clipId, pos.next.lane, { time: pos.next.sourceTime, gain: pos.progress, play: playing, lead: false });
     const up = lay.shots[pos.shot.shotIndex + (pos.next ? 2 : 1)];
-    if (up && up.start - t < PRELOAD) put(up.clipId, up.lane, { time: up.sourceStart, gain: 0, play: false });
+    if (up && up.start - t < PRELOAD) put(up.clipId, up.lane, { time: up.sourceStart, gain: 0, play: false, lead: false });
 
     const sound = audio && !this.soundBlocked;
     for (const el of this.els.values()) {
@@ -52,11 +59,29 @@ export class VideoPlayer {
       }
       el.muted = !sound || w.gain <= 0;
       el.volume = Math.min(1, Math.max(0, w.gain));
-      const tolerance = w.play ? DRIFT : STILL_TOLERANCE;
-      if (!el.seeking && Math.abs(el.currentTime - w.time) > tolerance) el.currentTime = w.time;
+      // A seek takes a while on long-GOP phone footage; seeking at every small drift would never let it play.
+      const drift = w.time - el.currentTime;
+      const tolerance = !w.play ? STILL_TOLERANCE : w.lead ? LEAD_DRIFT : FOLLOW_DRIFT;
+      if (!el.seeking && Math.abs(drift) > tolerance) el.currentTime = w.time;
+      const shift = w.play && !w.lead && Math.abs(drift) > STILL_TOLERANCE ? drift * CATCH_UP : 0;
+      el.playbackRate = 1 + Math.max(-MAX_RATE_SHIFT, Math.min(MAX_RATE_SHIFT, shift));
       if (w.play && el.paused) this.start(el);
       else if (!w.play && !el.paused) el.pause();
     }
+  }
+
+  /**
+   * While playing, the output time the shown shot's video has reached – it sets the pace, so the
+   * picture never waits on a seek. 'wait' while it is still starting or seeking; null once it has
+   * ended (the clock then runs on its own).
+   */
+  lead(lay: Layout, pos: VideoFramePosition): number | 'wait' | null {
+    const el = this.els.get(`${pos.shot.clipId}:${pos.shot.lane}`);
+    if (!el) return 'wait';
+    if (el.ended) return null;
+    if (el.paused || el.seeking || el.readyState < 3) return 'wait';
+    const shot = lay.shots[pos.shot.shotIndex];
+    return shot.start + (el.currentTime - shot.sourceStart);
   }
 
   /** The elements for `pos`, or null while one of them has no picture yet. */
@@ -75,7 +100,10 @@ export class VideoPlayer {
   }
 
   pause(): void {
-    for (const el of this.els.values()) el.pause();
+    for (const el of this.els.values()) {
+      el.pause();
+      el.playbackRate = 1;
+    }
   }
 
   private el(clipId: string, lane: 0 | 1): HTMLVideoElement | null {

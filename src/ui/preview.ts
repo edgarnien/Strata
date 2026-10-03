@@ -16,6 +16,10 @@ export interface PreviewApi {
 }
 
 const PAD = 16;
+/** How long the clock waits for a video to start or seek before it runs on without it (s). */
+const MAX_WAIT = 0.5;
+/** Longest step the clock takes in one frame, so a stalled tab doesn't jump ahead (s). */
+const MAX_STEP = 0.1;
 
 export function mountPreview(root: HTMLElement, pickFiles: () => void, addFiles: (files: File[]) => void, videoHost: HTMLElement): PreviewApi {
   const canvas = root.querySelector('canvas');
@@ -28,7 +32,10 @@ export function mountPreview(root: HTMLElement, pickFiles: () => void, addFiles:
   let dirty = true;
   let raf = 0;
   let startedAt = 0;
-  let playFrom = 0;
+  /** Video mode while playing: the clock, its last tick and how long it has waited for the video. */
+  let clock = 0;
+  let tickedAt = 0;
+  let waited = 0;
   let lastT: number | null = null;
   let empty: HTMLElement | null = null;
   let emptyMode = '';
@@ -72,9 +79,23 @@ export function mountPreview(root: HTMLElement, pickFiles: () => void, addFiles:
       player.pause();
       return false;
     }
-    let t = Math.min(playhead.get(), scene.layout.duration);
+    const lay = scene.layout;
+    let t = Math.min(playhead.get(), lay.duration);
     if (playing.get()) {
-      t = (playFrom + (now - startedAt) / 1000) % scene.layout.duration;
+      // The shown video sets the pace; the clock only runs on its own while no video can lead.
+      const step = Math.min(MAX_STEP, Math.max(0, (now - tickedAt) / 1000));
+      tickedAt = now;
+      const lead = player.lead(lay, videoPosition(scene, clock));
+      if (typeof lead === 'number') {
+        clock = lead;
+        waited = 0;
+      } else if (lead === 'wait' && waited < MAX_WAIT) {
+        waited += step;
+      } else {
+        clock += step;
+      }
+      if (clock >= lay.duration) clock = 0;
+      t = clock;
       playhead.set(t);
     }
     const pos = videoPosition(scene, t);
@@ -118,7 +139,9 @@ export function mountPreview(root: HTMLElement, pickFiles: () => void, addFiles:
     if (on) {
       startedAt = performance.now();
       const duration = videoScene.get()?.layout.duration ?? 0;
-      playFrom = playhead.get() >= duration - 1 / 30 ? 0 : playhead.get();
+      clock = playhead.get() >= duration - 1 / 30 ? 0 : playhead.get();
+      tickedAt = startedAt;
+      waited = 0;
       player.allowSound();
     } else {
       player.pause();
